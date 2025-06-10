@@ -1,0 +1,37 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "vue/research-vue3-app/.editorconfig": true,
+        "vue/research-vue3-app/.gitattributes": true,
+        "vue/research-vue3-app/.gitignore": true,
+        "vue/research-vue3-app/.prettierrc.json": true,
+        "vue/research-vue3-app/env.d.ts": true,
+        "vue/research-vue3-app/eslint.config.ts": true,
+        "vue/research-vue3-app/package-lock.json": true,
+        "vue/research-vue3-app/package.json": true,
+        "vue/research-vue3-app/README.md": true,
+        "vue/research-vue3-app/tsconfig.app.json": true,
+        "vue/research-vue3-app/tsconfig.json": true,
+        "vue/research-vue3-app/tsconfig.node.json": true,
+        "vue/research-vue3-app/tsconfig.vitest.json": true
+    },
+    "hide-files.files": [
+        "vue/research-vue3-app/.editorconfig",
+        "vue/research-vue3-app/.gitattributes",
+        "vue/research-vue3-app/.gitignore",
+        "vue/research-vue3-app/.prettierrc.json",
+        "vue/research-vue3-app/env.d.ts",
+        "vue/research-vue3-app/eslint.config.ts",
+        "vue/research-vue3-app/package-lock.json",
+        "vue/research-vue3-app/package.json",
+        "vue/research-vue3-app/README.md",
+        "vue/research-vue3-app/tsconfig.app.json",
+        "vue/research-vue3-app/tsconfig.json",
+        "vue/research-vue3-app/tsconfig.node.json",
+        "vue/research-vue3-app/tsconfig.vitest.json"
+    ]
+}

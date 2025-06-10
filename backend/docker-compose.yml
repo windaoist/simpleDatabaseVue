@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # image: thosakahow/relateddata:v1.0
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=root
+      - MYSQL_DB=myDatabase
+    depends_on:
+      - mysql
+    volumes:
+      - .:/app
+
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: myDatabase
+    command: >
+      --default-authentication-plugin=caching_sha2_password
+      --host_cache_size=0
+      --secure-file-priv=NULL
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./myDatabase.sql:/docker-entrypoint-initdb.d/myDatabase.sql:ro
+
+volumes:
+  mysql_data:

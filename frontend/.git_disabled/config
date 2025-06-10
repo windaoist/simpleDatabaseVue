@@ -1,0 +1,10 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[remote "simpleDatabaseVue"]
+	url = https://github.com/windaoist/simpleDatabaseVue.git
+	fetch = +refs/heads/*:refs/remotes/simpleDatabaseVue/*
