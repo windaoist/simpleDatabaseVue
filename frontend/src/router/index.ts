@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import MainView from '@/views/MainView.vue'
 import AddView from '@/views/AddView.vue'
 import UploadView from '../views/UploadView.vue'
-import DownloadView from '../views/DownloadView.vue'
 import QueryView from '@/views/QueryView.vue'
 
 const router = createRouter({
@@ -27,7 +26,7 @@ const router = createRouter({
       path: '/upload',
       name: 'upload',
       component: UploadView,
-    }
+    },
   ],
 })
 

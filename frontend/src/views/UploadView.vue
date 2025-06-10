@@ -2,7 +2,7 @@
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
 async function uploadFile(option) {
-  const { file, onProgress, onSuccess, onError } = option
+  const { file, onProgress, onSuccess } = option
 
   const formData = new FormData()
   formData.append('file', file)
@@ -24,7 +24,7 @@ async function uploadFile(option) {
   } catch (error) {
     // console.error(error)
     // onError(error)
-    ElMessage.error('上传失败！')
+    ElMessage.error('上传失败：', error)
   }
 }
 const beforeUpload = (file) => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
-import * as translate from '@/stores/LanguageConverter.ts'
+// import * as translate from '@/stores/LanguageConverter.ts'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const queryForm = ref({
@@ -13,7 +13,16 @@ const industries = ref()
 const currentForm = ref()
 // const editingState = reactive({});
 // const editedData = ref([]);
-const responseData = ref([])
+const responseData = ref({
+  data: {
+    results: [],
+    related_data: {
+      related_experts: [],
+      related_projects: [],
+      related_funds: [],
+    },
+  },
+})
 const activeName = ref()
 // 新增：用于存储原始列顺序
 const columnOrder = ref([])
@@ -48,7 +57,7 @@ const onQuerySubmit = async () => {
     console.log('查询结果:', responseData.value)
   } catch (error) {
     console.error('查询失败:', error)
-    ElMessage.error('查询失败，请稍后再试。')
+    ElMessage.error('查询失败：' + error.message)
   }
 }
 // 编辑状态
@@ -86,103 +95,11 @@ const handleReset = (row) => {
 }
 // 处理提交操作
 const handleSubmit = async (row) => {
-  console.log('提交数据:', row)
-  // 提取数据
-  // const keys = processRow(row, industries.value);
-  console.log('原本的值', originalData.value[editingId.value])
-  const original = originalData.value[editingId.value]
-  // console.log('处理后的键值:', keys);
-  // 1. 提取前两项键值对到keys
-  const colOrder = original.__colOrder
-  const keys = {}
-  if (colOrder && colOrder.length >= 2) {
-    const [firstKey, secondKey] = colOrder.slice(0, 2)
-    keys[0] = original[firstKey]
-    keys[1] = original[secondKey]
-  }
-  const [firstKey, secondKey] = colOrder.slice(0, 2)
-  const firstValue = row[firstKey] || ''
-  const secondValue = row[secondKey] || ''
-  // 检查重复：确保没有其他行有相同的前两列值
-  const duplicateRow = responseData.value.data.results.find(
-    (r) => r.序号 !== row.序号 && r[firstKey] === firstValue && r[secondKey] === secondValue,
-  )
-
-  if (duplicateRow) {
-    // 发现重复，重置行数据并提示
-    Object.assign(row, originalData.value[editingId.value])
-    ElMessage.error('修改后的数据与已有行重复，请修改')
-    return
-  }
   try {
-    // 2. 获取产业链字段名（动态适配不同键名）
-    const industryField = colOrder[1] // __colOrder第二项始终是产业链字段
-
-    // 3. 创建产业链名称到ID的映射
-    const industryMap = {}
-    industries.value.forEach((industry) => {
-      industryMap[industry.industry_name] = industry.id
-    })
-
-    // 4. 替换keys中的产业链名称为ID
-    if (original[industryField]) {
-      const industryName = original[industryField]
-      keys[1] = industryMap[industryName] || null // 使用映射替换产业链名称
-    }
-
-    // 5. 创建row的副本并替换产业链名称为ID
-    const newRow = { ...row }
-
-    if (newRow[industryField]) {
-      const industryName = newRow[industryField]
-      newRow[industryField] = industryMap[industryName] || null
-    }
-
-    const payload = {
-      table: currentForm.value,
-      old_key1: keys[0],
-      old_key2: keys[1],
-      data: {},
-    }
-    //填充 data
-    Object.keys(row).forEach((key) => {
-      if (key !== '序号' && key !== '__colOrder') {
-        const newKey = translate.translateToEnglish(key)
-        payload.data[newKey] = newRow[key]
-      }
-    })
-
-    console.log('提交的有效载荷:', payload)
-    await request.post('add-edit/edit', payload, {
-      headers: {
-        Accept: '*/*',
-        'Content-Type': 'application/json',
-      },
-    })
-
-    // 检查修改后的前两列是否还满足查询条件
-
-    // 检查第一个查询条件
-    const keyword1Match = queryForm.value.keyword1
-      ? firstValue.includes(queryForm.value.keyword1)
-      : true
-
-    // 检查第二个查询条件
-    const keyword2Match = queryForm.value.keyword2
-      ? secondValue.includes(queryForm.value.keyword2)
-      : true
-
-    // 如果任一条件不满足，从结果集中移除该行
-    if (!keyword1Match || !keyword2Match) {
-      const index = responseData.value.data.results.findIndex((r) => r.序号 === row.序号)
-
-      if (index !== -1) {
-        responseData.value.data.results.splice(index, 1)
-      }
-    }
+    console.log('提交数据:', row)
   } catch (error) {
     console.error('提交失败:', error)
-    ElMessage.error('提交失败:', error)
+    ElMessage.error('提交失败:' + error.message)
   }
   // 清除编辑状态
   editingId.value = null
@@ -259,7 +176,7 @@ async function onDownload() {
       document.body.removeChild(link)
     }
   } catch (error) {
-    ElMessage.error('导出失败:', error)
+    ElMessage.error('导出失败:' + error.message)
   }
 }
 const editingRow = ref()
@@ -466,7 +383,6 @@ onMounted(() => {
               :key="key"
               :prop="key"
               :label="key"
-              :width="key.includes('金额') ? 120 : undefined"
             >
             </el-table-column>
           </el-table>

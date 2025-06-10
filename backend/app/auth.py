@@ -4,6 +4,7 @@ from app.database import get_db_connection
 import jwt
 import datetime
 import os
+import pdb
 
 auth_bp = Blueprint('auth_bp', __name__)
 ns = Namespace('auth', description='用户登录接口')
@@ -16,7 +17,8 @@ def api_response(success, message, data=None, status=200):
 
 
 def generate_token(username, role):
-    payload = {'username': username, 'role': role, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=6)}
+    payload = {'username': username, 'role': role,
+               'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=6)}
     return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
 
@@ -37,7 +39,7 @@ class Login(Resource):
         username = data.get('username')
         password = data.get('password')
         role = data.get('role')
-
+        # pdb.set_trace()  # 调试用，查看数据内容
         if not all([username, password, role]):
             return api_response(False, '缺少参数', status=400)
 
@@ -55,7 +57,8 @@ class Login(Resource):
 
             # 教职工（专家表）
             if role == 'Teacher':
-                cursor.execute("SELECT * FROM Expert WHERE expert_name = %s", (username, ))
+                cursor.execute(
+                    "SELECT * FROM Expert WHERE expert_name = %s", (username, ))
                 user = cursor.fetchone()
                 if not user:
                     return api_response(False, '教职工账号不存在', status=404)
@@ -64,7 +67,8 @@ class Login(Resource):
 
             # 学生（基金表）
             elif role == 'Student':
-                cursor.execute("SELECT * FROM Fund WHERE fund_name = %s", (username, ))
+                cursor.execute(
+                    "SELECT * FROM Fund WHERE fund_name = %s", (username, ))
                 user = cursor.fetchone()
                 if not user:
                     return api_response(False, '学生账号不存在', status=404)

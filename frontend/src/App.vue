@@ -1,12 +1,56 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import request from '@/utils/request'
 
 const navItems = [
   { name: '添加数据', path: '/add' },
   { name: '上传数据', path: '/upload' },
   { name: '查询数据', path: '/query' },
 ]
+const roles = [
+  { name: '管理员', value: 'Admin' },
+  { name: '老师', value: 'Teacher' },
+  { name: '学生', value: 'Student' },
+]
+const loginDialogVisible = ref(false)
+const account = ref({
+  username: '',
+  password: '',
+  role: '',
+})
+const LoggedIn = ref(false)
+async function handleLogin() {
+  if (account.value.username === '' || account.value.password === '' || account.value.role === '') {
+    ElMessage.error('用户名，密码或类别不能为空')
+    return
+  }
+  // 模拟登录成功
+  try {
+    const response = await request.post('/auth/login', account.value)
+    localStorage.setItem('jwt_token', response.data.token)
+    LoggedIn.value = true
+  } catch (error) {
+    console.error('登录失败', error.message)
+    ElMessage.error('登录失败：' + error.response?.data?.message || '请稍后再试')
+    return
+  }
+  loginDialogVisible.value = false
+  console.log('登录成功', account.value)
+  ElMessage.success('登录成功')
+}
+async function handleLogout() {
+  try {
+    // await request.post('/auth/logout')
+    localStorage.removeItem('jwt_token')
+    LoggedIn.value = false
+    ElMessage.success('注销成功')
+  } catch (error) {
+    console.error('注销失败', error.message)
+    ElMessage.error('注销失败：' + error.response?.data?.message || '请稍后再试')
+  }
+}
 onMounted(() => {
   console.log(window.devicePixelRatio)
 })
@@ -14,6 +58,49 @@ onMounted(() => {
 
 <template>
   <div class="common-layout">
+    <!-- 登录对话框 -->
+    <el-dialog
+      v-model="loginDialogVisible"
+      title="用户登录"
+      width="450px"
+      class="login-dialog"
+      :close-on-click-modal="false"
+      :show-close="false"
+    >
+      <template #header>
+        <div class="dialog-header">
+          <h2 style="color: black">欢迎登录</h2>
+        </div>
+      </template>
+      <div class="login-form">
+        <el-input v-model="account.username" placeholder="请输入用户名" class="login-input">
+          <template #prepend> 用户名 </template></el-input
+        >
+        <el-input
+          v-model="account.password"
+          type="password"
+          show-password
+          placeholder="请输入密码"
+          class="login-input"
+        >
+          <template #prepend> 密码 </template></el-input
+        >
+        <el-select v-model="account.role" placeholder="请选择用户类别" class="login-input">
+          <el-option
+            v-for="role in roles"
+            :key="role.value"
+            :label="role.name"
+            :value="role.value"
+          ></el-option>
+        </el-select>
+      </div>
+      <div class="login-actions">
+        <el-button type="info" @click="loginDialogVisible = false" class="login-btn">
+          取消
+        </el-button>
+        <el-button class="login-btn" type="primary" @click="handleLogin">登录</el-button>
+      </div>
+    </el-dialog>
     <el-container>
       <el-header>
         <div class="header-content">
@@ -21,7 +108,24 @@ onMounted(() => {
             <img alt="Vue logo" class="logo" src="@/assets/logo.svg" />
             <h1 class="app-title">数据库操作平台</h1>
           </div>
-
+          <el-button
+            type="primary"
+            v-if="!LoggedIn"
+            style="margin-left: 5%"
+            class="icon-wrapper"
+            @click="loginDialogVisible = true"
+          >
+            登录
+          </el-button>
+          <el-button
+            type="danger"
+            v-else
+            style="margin-left: 5%"
+            class="icon-wrapper"
+            @click="handleLogout"
+          >
+            注销
+          </el-button>
           <ElMenu
             mode="horizontal"
             class="app-menu"
@@ -55,6 +159,30 @@ body {
 }
 a {
   text-decoration: none;
+}
+.login-dialog {
+  display: flex;
+  justify-content: center;
+}
+.login-form {
+  width: 100%;
+  max-width: 400px;
+  margin: 20px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+.login-input {
+  width: 80%;
+}
+.login-actions {
+  display: flex;
+  justify-content: space-evenly;
+  margin-top: 20px;
+}
+.login-btn {
+  width: 20%;
 }
 .common-layout {
   min-height: 100vh;
