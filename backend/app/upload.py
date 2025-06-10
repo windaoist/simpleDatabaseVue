@@ -13,7 +13,7 @@ api = Api(upload_bp, version='1.0', title='Upload API', description='文件上�
 ns = Namespace('upload', description='文件上传操作')
 api.add_namespace(ns)
 
-# 定义响应模型
+# 定义响应模型bdwsdbsdbdfndf
 upload_response = ns.model(
     'UploadResponse', {
         'code': fields.Integer(description='状态码'),
