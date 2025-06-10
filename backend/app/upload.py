@@ -57,7 +57,7 @@ class UploadResource(Resource):
 # 导入学生表
 def import_student_data(file):
     df = pd.read_excel(file, header=0, engine='openpyxl')
-    df.columns = ['序号', '学生学号', '姓名', '性别', '年级', '专业', '班级', '研究方向', '联系电话', '电子邮箱']
+    df.columns = ['序号', '学生学号', '姓名', '性别', '年级', '专业', '班级', '研究领域', '联系电话', '电子邮箱']
     df = df.rename(columns={v: k for k, v in COLUMN_MAPPING.items()})
     df = df.fillna('')
 
@@ -87,7 +87,7 @@ def import_student_data(file):
 
                 cursor.execute(
                     "INSERT INTO Student (student_id, name, gender, grade, major, class, phone, email) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                     (student_id, row['name'], row['gender'], row['grade'], row['major'], row['class'], row['phone'], row['email']))
                 inserted_count += 1
 
@@ -103,9 +103,9 @@ def import_student_data(file):
                     if not res:
                         duplicates.add(f"无效研究领域: {fname}（学生 {student_id}）")
                         continue
-                    field_id = res['id']
+                    research_field = res['id']
                     # 插入中间表
-                    cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, field_id) VALUES (%s, %s)", (student_id, field_id))
+                    cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, research_field) VALUES (%s, %s)", (student_id, research_field))
 
             except Exception as e:
                 duplicates.add(f"插入失败: {student_id}，错误: {str(e)}")
@@ -184,9 +184,9 @@ def import_teacher_data(file):
                     if not res:
                         duplicates.add(f"无效研究领域: {fname}（教师 {teacher_id}）")
                         continue
-                    field_id = res['id']
+                    research_field = res['id']
                     # 插入中间表
-                    cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, field_id) VALUES (%s, %s)", (teacher_id, field_id))
+                    cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, research_field) VALUES (%s, %s)", (teacher_id, research_field))
 
             except Exception as e:
                 duplicates.add(f"插入失败: {teacher_id}，错误: {str(e)}")
@@ -262,9 +262,9 @@ def import_project_data(file):
                     if not res:
                         duplicates.add(f"无效研究领域: {fname}（项目 {project_id}）")
                         continue
-                    field_id = res['id']
+                    research_field = res['id']
                     # 插入中间表
-                    cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, field_id) VALUES (%s, %s)", (project_id, field_id))
+                    cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, research_field) VALUES (%s, %s)", (project_id, research_field))
 
                 # 插入负责人（学生，最多1个）
                 leader_ids = [s.strip() for s in row.get('负责人学号', '').split('、') if s.strip()]

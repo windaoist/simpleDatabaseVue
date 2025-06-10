@@ -72,10 +72,10 @@ class QueryResource(Resource):
         research_field_list = request.args.getlist('research_field')  # e.g., ?research_field=1&research_field=2
         research_field_ids = [int(i) for i in research_field_list if i.strip().isdigit()]
 
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
+        try:
             # 获取字段名（用于合法性校验）
             cursor.execute(f"SHOW COLUMNS FROM {view_table}")
             valid_fields = [f['Field'] for f in cursor.fetchall()]

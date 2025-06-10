@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS Project (
     project_content TEXT COMMENT '项目内容',
     project_application_status VARCHAR(20) DEFAULT '未申报',
     project_approval_status VARCHAR(20) DEFAULT '未审批',
-    project_acceptance_status VARCHAR(20) DEFAULT '未验收',
+    project_acceptance_status VARCHAR(20) DEFAULT '未验收'
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 

@@ -122,7 +122,7 @@ class AddData(Resource):
                         cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
                         row = cursor.fetchone()
                         if row:
-                            cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, field_id) VALUES (%s, %s)",
+                            cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, research_field) VALUES (%s, %s)",
                                            (record_data['student_id'], row['id']))
 
                 response_data['record'] = {'student_id': record_data['student_id']}
@@ -156,7 +156,7 @@ class AddData(Resource):
                         cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
                         row = cursor.fetchone()
                         if row:
-                            cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, field_id) VALUES (%s, %s)",
+                            cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, research_field) VALUES (%s, %s)",
                                            (record_data['teacher_id'], row['id']))
 
                 response_data['record'] = {'teacher_id': record_data['teacher_id']}
@@ -207,9 +207,9 @@ class AddData(Resource):
 
                 # 插入研究领域关联
                 field_str = record_data.get('research_field', '')
-                field_ids = [int(fid) for fid in field_str.split('、') if fid.isdigit()]
-                for fid in field_ids:
-                    cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, field_id) VALUES (%s, %s)", (project_id, fid))
+                research_fields = [int(fid) for fid in field_str.split('、') if fid.isdigit()]
+                for fid in research_fields:
+                    cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, research_field) VALUES (%s, %s)", (project_id, fid))
 
                 # 插入负责人（学生）
                 if leader_ids:
@@ -305,7 +305,7 @@ class EditData(Resource):
                     cursor.execute("SELECT id FROM ResearchFields WHERE research_field=%s", (rf.strip(), ))
                     row = cursor.fetchone()
                     if row:
-                        cursor.execute("INSERT INTO StudentResearchField (student_id, field_id) VALUES (%s, %s)", (new_key, row['id']))
+                        cursor.execute("INSERT INTO StudentResearchField (student_id, research_field) VALUES (%s, %s)", (new_key, row['id']))
                 response_data['record'] = {'student_id': new_key}
 
             elif table == 'Teacher':
@@ -330,7 +330,7 @@ class EditData(Resource):
                     cursor.execute("SELECT id FROM ResearchFields WHERE research_field=%s", (rf.strip(), ))
                     row = cursor.fetchone()
                     if row:
-                        cursor.execute("INSERT INTO TeacherResearchField (teacher_id, field_id) VALUES (%s, %s)", (new_key, row['id']))
+                        cursor.execute("INSERT INTO TeacherResearchField (teacher_id, research_field) VALUES (%s, %s)", (new_key, row['id']))
                 response_data['record'] = {'teacher_id': new_key}
 
             elif table == 'Project':
@@ -373,7 +373,7 @@ class EditData(Resource):
                     cursor.execute("SELECT id FROM ResearchFields WHERE research_field=%s", (rf.strip(), ))
                     row = cursor.fetchone()
                     if row:
-                        cursor.execute("INSERT INTO ProjectResearchField (project_id, field_id) VALUES (%s, %s)", (new_key, row['id']))
+                        cursor.execute("INSERT INTO ProjectResearchField (project_id, research_field) VALUES (%s, %s)", (new_key, row['id']))
 
                 # 更新人员关系
                 cursor.execute("DELETE FROM StudentProject WHERE project_id=%s", (new_key, ))
