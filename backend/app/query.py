@@ -14,22 +14,29 @@ success_model = query_ns.model('SuccessResponse', {
     'message': fields.String(description='响应消息'),
     'data': fields.Raw(description='响应数据')
 })
-error_model = query_ns.model('ErrorResponse', {'success': fields.Boolean(default=False), 'message': fields.String(description='错误信息')})
+error_model = query_ns.model('ErrorResponse', {'success': fields.Boolean(
+    default=False), 'message': fields.String(description='错误信息')})
 
 # 请求参数定义
-query_parser = reqparse.RequestParser()
-query_parser.add_argument(
-    'table', type=str, required=True,
-    choices=('Student', 'Teacher', 'Project'),
-    help='查询的目标表，如 Student、Teacher、Project',
-    location='args'
-)
-
-query_parser.add_argument(
-    'filters', type=str, required=False,
-    help='字段字典（JSON 字符串），如 {"name":"张三","email":"hfut"}',
-    location='args'
-)
+query_model = query_ns.model('QueryRequest', {
+    'table': fields.String(
+        required=True,
+        description='查询的目标表',
+        enum=['Student', 'Teacher', 'Project'],
+        example='Student'
+    ),
+    'filters': fields.Raw(
+        required=False,
+        description='字段过滤条件（动态键值对）',
+        example={'name': '张三', 'gender': '男'}
+    ),
+    'research_field': fields.List(
+        fields.Integer,
+        required=False,
+        description='研究领域ID列表',
+        example=[1, 3]
+    )
+})
 
 
 # decimal类型转换
@@ -48,17 +55,25 @@ def convert_decimal(obj):
 class QueryResource(Resource):
 
     @query_ns.doc('query_data')
-    @query_ns.expect(query_parser)
+    @query_ns.expect(query_model)
     @query_ns.response(200, '成功响应', success_model)
     @query_ns.response(400, '参数错误', error_model)
     @query_ns.response(403, '权限不足')
     @query_ns.response(500, '服务器错误', error_model)
     @auth_required(roles=['Admin', 'Teacher', 'Student'])
-    def get(self):
+    def post(self):
         """支持字段字典模糊查询 + 多研究领域筛选 + 权限控制 + 视图优化"""
-        params = request.args.to_dict()
-        table = params.get('table')
+        # 获取JSON请求体
+        data = request.get_json()
+        if not data:
+            return api_response(False, '请求体必须为JSON', status=400)
+
+        table = data.get('table')
         user = request.user
+        # 直接从JSON获取filters字段
+        filters = data.get('filters', {})
+        # 直接从JSON获取research_field字段
+        research_field_ids = data.get('research_field', [])
         username = user['username']
         role = user['role']
 
@@ -66,11 +81,50 @@ class QueryResource(Resource):
             return api_response(False, '缺少table参数', status=400)
 
         view_table = f"view_{table.lower()}"  # 使用视图查询
-        keyword_dict = {k: v.strip() for k, v in params.items() if k not in ['table', 'research_field'] and v.strip()}
 
-        # 处理研究领域（必须为列表）
-        research_field_list = request.args.getlist('research_field')  # e.g., ?research_field=1&research_field=2
-        research_field_ids = [int(i) for i in research_field_list if i.strip().isdigit()]
+        # 处理过滤条件 - 直接从filters字段获取
+        # 替换原有的params处理逻辑
+        keyword_dict = {}
+        if isinstance(filters, dict):
+            # 清理过滤值：去除空格，忽略空值
+            keyword_dict = {k: v.strip() for k, v in filters.items()
+                            if isinstance(v, str) and v.strip()}
+            # 处理非字符串值（如数字、布尔值等）
+            non_str_items = {k: v for k, v in filters.items()
+                             if not isinstance(v, str)}
+            keyword_dict.update(non_str_items)
+        # else:
+            # 如果filters不是字典，记录警告但继续执行
+            # current_app.logger.warning(f"Invalid filters type: {type(filters)}")
+
+        # 确保研究领域ID是整数列表
+        if not isinstance(research_field_ids, list):
+            research_field_ids = []
+        try:
+            research_field_ids = [int(i) for i in research_field_ids]
+        except (ValueError, TypeError):
+            research_field_ids = []
+
+        # 后续数据库连接和查询代码保持不变...
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 构建查询条件和参数（使用keyword_dict代替原来的params）
+        conditions = []
+        params = []
+
+        # 处理动态过滤条件（模糊查询）
+        # for key, value in keyword_dict.items():
+        #     # 这里需要验证key是否是有效字段名
+        #     if is_valid_field(key):  # 假设有字段验证函数
+        #         conditions.append(f"{key} ILIKE %s")
+        #         params.append(f"%{value}%")
+
+        # 处理研究领域条件
+        if research_field_ids:
+            # 原代码中的研究领域处理逻辑
+            conditions.append("research_field_ids @> %s")
+            params.append(research_field_ids)  # 直接传递整数列表
 
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -97,7 +151,8 @@ class QueryResource(Resource):
             # 身份权限过滤（仅对 Project 表）
             if table == 'Project':
                 if role == 'Student':
-                    wheres.append("FIND_IN_SET(%s, leader_names) > 0 OR FIND_IN_SET(%s, member_names) > 0")
+                    wheres.append(
+                        "FIND_IN_SET(%s, leader_names) > 0 OR FIND_IN_SET(%s, member_names) > 0")
                     sql_params += [username, username]
                 elif role == 'Teacher':
                     wheres.append("FIND_IN_SET(%s, teacher_names) > 0")
@@ -115,10 +170,12 @@ class QueryResource(Resource):
             for idx, row in enumerate(rows, 1):
                 row = dict(row)
                 row['序号'] = idx
-                results.append({COLUMN_MAPPING.get(k, k): v for k, v in row.items()})
+                results.append(
+                    {COLUMN_MAPPING.get(k, k): v for k, v in row.items()})
 
             # 查询关联数据（用于推荐或筛选）
-            related_data = get_related_data_api(cursor, table, research_field_ids) if research_field_ids else {}
+            related_data = get_related_data_api(
+                cursor, table, research_field_ids) if research_field_ids else {}
 
             return {
                 'success': True,

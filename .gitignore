@@ -9,3 +9,5 @@
 /backend/app/temp_exports
 /backend/app/templates
 /backend/node_modules
+
+/backend/app/database.py
