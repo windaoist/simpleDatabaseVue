@@ -1,4 +1,4 @@
-# from app.database import get_db_connection
+from app.database import get_db_connection
 from functools import wraps
 from flask import request
 import jwt
@@ -34,6 +34,10 @@ COLUMN_MAPPING = {
 }
 
 
+def api_response(success, message, data=None, status=200):
+    """统一API响应格式"""
+    return {'success': success, 'message': message, 'data': data}, status
+
 # # 获取ID
 # def get_field_id(research_field):
 #     connection = get_db_connection()
@@ -48,41 +52,53 @@ COLUMN_MAPPING = {
 
 
 # 获取研究领域列表
-# def get_fields():
-#     connection = get_db_connection()
-#     cursor = connection.cursor()
-#     cursor.execute("SELECT id, research_field FROM ResearchFields")
-#     fields = cursor.fetchall()
-#     cursor.close()
-#     connection.close()
+def get_fields():
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, research_field FROM ResearchFields")
+    fields = cursor.fetchall()
+    cursor.close()
+    connection.close()
 
-#     return fields
+    return fields
 
 
 def get_related_data_api(cursor, table, field_ids):
     """
-    使用 SQL 查询相关表的研究领域匹配数据
+    使用视图查询研究领域匹配数据（排除自身）
     """
-    related_data = {'related_students': [], 'related_teachers': [], 'related_projects': []}
+    related_data = {
+        'related_students': [],
+        'related_teachers': [],
+        'related_projects': []
+    }
 
-    fields = {'Student': 'research_field', 'Teacher': 'research_field', 'Project': 'research_field'}
+    view_map = {
+        'Student': 'view_student',
+        'Teacher': 'view_teacher',
+        'Project': 'view_project'
+    }
 
-    for related_table, col in fields.items():
+    for related_table in ['Student', 'Teacher', 'Project']:
         if related_table == table:
             continue  # 跳过主表
 
-        placeholders = ', '.join(['%s'] * len(field_ids))
-        sql = f"SELECT * FROM {related_table} WHERE {col} IN ({placeholders})"
+        view_name = view_map[related_table]
 
         try:
-            cursor.execute(sql, field_ids)
+            # 使用 REGEXP 匹配研究领域
+            pattern = '|'.join([str(fid) for fid in field_ids])
+            sql = f"SELECT * FROM {view_name} WHERE research_field REGEXP %s"
+            cursor.execute(sql, (pattern,))
             rows = cursor.fetchall()
+
             for idx, row in enumerate(rows, 1):
                 row = dict(row)
                 row['序号'] = idx
                 related_data[f'related_{related_table.lower()}s'].append(row)
+
         except Exception as e:
-            print(f"关联查询 {related_table} 出错: {e}")
+            print(f"[相关数据查询失败] {related_table}: {e}")
             continue
 
     return related_data

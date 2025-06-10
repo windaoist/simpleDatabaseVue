@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 from flask_restx import Namespace, Resource, fields, reqparse
-from app.utils import COLUMN_MAPPING, get_related_data_api, auth_required
+from app.utils import COLUMN_MAPPING, get_related_data_api, auth_required, api_response
 from app.database import get_db_connection
 import traceback
 import decimal
@@ -46,94 +46,69 @@ class QueryResource(Resource):
     @query_ns.response(500, '服务器错误', error_model)
     @auth_required(roles=['Admin', 'Teacher', 'Student'])
     def get(self):
-        """支持全字段模糊查询 + 多研究领域筛选 + 身份权限控制"""
-        params = request.args
-        keyword = params.get('keyword', '').strip()
+        """支持字段字典模糊查询 + 多研究领域筛选 + 权限控制 + 视图优化"""
+        params = request.args.to_dict()
         table = params.get('table')
-        research_field_raw = params.get('research_field', '')
         user = request.user
         username = user['username']
         role = user['role']
+
+        if not table:
+            return api_response(False, '缺少table参数', status=400)
+
+        view_table = f"view_{table.lower()}"  # 使用视图查询
+        keyword_dict = {k: v.strip() for k, v in params.items() if k not in ['table', 'research_field'] and v.strip()}
+
+        # 处理研究领域（必须为列表）
+        research_field_list = request.args.getlist('research_field')  # e.g., ?research_field=1&research_field=2
+        research_field_ids = [int(i) for i in research_field_list if i.strip().isdigit()]
 
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            # 获取表字段名，排除 id 和 auto_increment
-            cursor.execute(f"SHOW COLUMNS FROM {table}")
-            fields = [f['Field'] for f in cursor.fetchall() if f['Field'].lower() not in ['id']]
+            # 获取字段名（用于合法性校验）
+            cursor.execute(f"SHOW COLUMNS FROM {view_table}")
+            valid_fields = [f['Field'] for f in cursor.fetchall()]
+            wheres = []
+            sql_params = []
 
-            # 构造模糊查询条件（全字段）
-            like_conditions = [f"{table}.{col} LIKE %s" for col in fields]
-            sql = f"SELECT DISTINCT {table}.* FROM {table}"  # DISTINCT 避免因 JOIN 多行重复
-            joins = []
-            wheres = ["(" + " OR ".join(like_conditions) + ")"]
-            sql_params = [f"%{keyword}%"] * len(like_conditions)
+            # 处理模糊查询（每个字段独立 LIKE）
+            for field, keyword in keyword_dict.items():
+                if field in valid_fields:
+                    wheres.append(f"{field} LIKE %s")
+                    sql_params.append(f"%{keyword}%")
 
-            # 多研究领域筛选逻辑
-            research_field_ids = [int(i) for i in research_field_raw.split('、') if i.strip().isdigit()]
-            if research_field_ids:
-                rel_table = {
-                    'Student': 'StudentResearchField',
-                    'Teacher': 'TeacherResearchField',
-                    'Project': 'ProjectResearchField'
-                }[table]
-                id_col = {
-                    'Student': 'student_id',
-                    'Teacher': 'teacher_id',
-                    'Project': 'project_id'
-                }[table]
-                joins.append(f"JOIN {rel_table} rf ON {table}.{id_col} = rf.{id_col}")
-                placeholders = ','.join(['%s'] * len(research_field_ids))
-                wheres.append(f"rf.field_id IN ({placeholders})")
-                sql_params += research_field_ids
+            # 研究领域查询（IN 结构）
+            if 'research_field' in valid_fields and research_field_ids:
+                wheres.append("research_field REGEXP %s")
+                pattern = '|'.join([str(fid) for fid in research_field_ids])
+                sql_params.append(pattern)
 
-            # 项目权限限制（身份过滤）
+            # 身份权限过滤（仅对 Project 表）
             if table == 'Project':
                 if role == 'Student':
-                    joins.append("JOIN StudentProject sp ON Project.project_id = sp.project_id")
-                    wheres.append("sp.student_id = %s")
-                    sql_params.append(username)
+                    wheres.append("FIND_IN_SET(%s, leader_names) > 0 OR FIND_IN_SET(%s, member_names) > 0")
+                    sql_params += [username, username]
                 elif role == 'Teacher':
-                    joins.append("JOIN TeacherProject tp ON Project.project_id = tp.project_id")
-                    wheres.append("tp.teacher_id = %s")
+                    wheres.append("FIND_IN_SET(%s, teacher_names) > 0")
                     sql_params.append(username)
 
-            # 拼接最终SQL
-            if joins:
-                sql += " " + " ".join(joins)
+            # 拼接SQL
+            sql = f"SELECT * FROM {view_table}"
             if wheres:
-                sql += " WHERE " + " AND ".join(wheres)
+                sql += " WHERE " + " AND ".join(f"({w})" for w in wheres)
 
-            # 执行主查询
             cursor.execute(sql, sql_params)
-            data_rows = cursor.fetchall()
+            rows = cursor.fetchall()
 
             results = []
-            for idx, row in enumerate(data_rows, 1):
+            for idx, row in enumerate(rows, 1):
                 row = dict(row)
-                row_display = {'序号': idx}
+                row['序号'] = idx
+                results.append({COLUMN_MAPPING.get(k, k): v for k, v in row.items()})
 
-                # 查询并拼接研究领域（适配多对多结构）
-                if table in ['Student', 'Teacher', 'Project']:
-                    id_col = {
-                        'Student': 'student_id',
-                        'Teacher': 'teacher_id',
-                        'Project': 'project_id'
-                    }[table]
-                    record_id = row[id_col]
-
-                    cursor.execute(
-                        f"SELECT rf.research_field FROM {table}ResearchField trf JOIN ResearchFields rf ON trf.field_id = rf.id WHERE trf.{id_col} = %s",
-                        (record_id,))
-                    field_names = [f['research_field'] for f in cursor.fetchall()]
-                    row_display['研究领域'] = '、'.join(field_names) if field_names else '无'
-
-                # 添加其他字段
-                row_display.update({COLUMN_MAPPING.get(k, k): v for k, v in row.items() if k not in ['research_field']})
-                results.append(row_display)
-
-            # 关联查询（只在有研究领域ID的情况下做）
+            # 查询关联数据（用于推荐或筛选）
             related_data = get_related_data_api(cursor, table, research_field_ids) if research_field_ids else {}
 
             return {
@@ -143,7 +118,7 @@ class QueryResource(Resource):
                     'results': convert_decimal(results),
                     'related_data': convert_decimal(related_data),
                     'query_params': {
-                        'keyword': keyword,
+                        'filters': keyword_dict,
                         'research_field': research_field_ids,
                         'table': table
                     }
