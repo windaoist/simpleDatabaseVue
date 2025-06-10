@@ -27,7 +27,7 @@ async function onQuery() {
       console.log('获取表格式成功', fields.value)
     }
   } catch (error) {
-    ElMessage.error('获取表格式失败')
+    ElMessage.error('获取表格式失败，' + error.message)
   }
 }
 async function handleSubmit() {

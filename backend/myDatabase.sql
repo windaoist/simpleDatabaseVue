@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS TeacherProject (
 CREATE TABLE IF NOT EXISTS StudentResearchField (
     student_id VARCHAR(20) NOT NULL COMMENT '学生学号',
     research_field INT NOT NULL COMMENT '研究领域',
-    PRIMARY KEY (student_id, field_id),
+    PRIMARY KEY (student_id, research_field),
     FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (research_field) REFERENCES ResearchFields(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS StudentResearchField (
 CREATE TABLE IF NOT EXISTS TeacherResearchField (
     teacher_id VARCHAR(20) NOT NULL COMMENT '教师工号',
     research_field INT NOT NULL COMMENT '研究领域',
-    PRIMARY KEY (teacher_id, field_id),
+    PRIMARY KEY (teacher_id, research_field),
     FOREIGN KEY (teacher_id) REFERENCES Teacher(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (research_field) REFERENCES ResearchFields(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS TeacherResearchField (
 CREATE TABLE IF NOT EXISTS ProjectResearchField (
     project_id VARCHAR(50) NOT NULL COMMENT '项目编号',
     research_field INT NOT NULL COMMENT '研究领域',
-    PRIMARY KEY (project_id, field_id),
+    PRIMARY KEY (project_id, research_field),
     FOREIGN KEY (project_id) REFERENCES Project(project_id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (research_field) REFERENCES ResearchFields(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -188,7 +188,7 @@ SELECT
 FROM Project p
 -- 连接多研究领域关系表
 LEFT JOIN ProjectResearchField prf ON p.project_id = prf.project_id
-LEFT JOIN ResearchFields rf ON prf.field_id = rf.id
+LEFT JOIN ResearchFields rf ON prf.research_field = rf.id
 -- 关联逻辑
 LEFT JOIN StudentProject sp ON p.project_id = sp.project_id
 LEFT JOIN Student s ON sp.student_id = s.student_id

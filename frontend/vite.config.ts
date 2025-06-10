@@ -1,5 +1,4 @@
 import { fileURLToPath, URL } from 'node:url'
-
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
@@ -8,7 +7,7 @@ import Inspector from 'vite-plugin-vue-inspector'
 import Inspect from 'vite-plugin-inspect'
 // https://vite.dev/config/
 export default defineConfig({
-  build:{
+  build: {
     sourcemap: true,
   },
   plugins: [
@@ -24,7 +23,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
 })
