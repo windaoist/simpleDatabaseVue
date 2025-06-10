@@ -205,7 +205,7 @@ SELECT
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field
 FROM Student s
 LEFT JOIN StudentResearchField srf ON s.student_id = srf.student_id
-LEFT JOIN ResearchFields rf ON srf.field_id = rf.id
+LEFT JOIN ResearchFields rf ON srf.research_field = rf.id
 GROUP BY s.student_id;
 
 
@@ -225,5 +225,5 @@ SELECT
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field
 FROM Teacher t
 LEFT JOIN TeacherResearchField trf ON t.teacher_id = trf.teacher_id
-LEFT JOIN ResearchFields rf ON trf.field_id = rf.id
+LEFT JOIN ResearchFields rf ON trf.research_field = rf.id
 GROUP BY t.teacher_id;

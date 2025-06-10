@@ -11,7 +11,7 @@ def create_app():
         'Bearer Auth': {
             'type': 'apiKey',
             'in': 'header',
-            'name': '认证',
+            'name': 'Authorization',
             'description': '输入JWT Bearer令牌'
         }
     }
