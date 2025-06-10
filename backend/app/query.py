@@ -18,9 +18,18 @@ error_model = query_ns.model('ErrorResponse', {'success': fields.Boolean(default
 
 # 请求参数定义
 query_parser = reqparse.RequestParser()
-query_parser.add_argument('keyword', type=str, help='模糊关键词（匹配所有字段）', location='args')
-query_parser.add_argument('research_field', type=str, help='研究领域ID，多个用顿号分隔', location='args')
-query_parser.add_argument('table', type=str, required=True, choices=('Student', 'Teacher', 'Project'), help='查询表名', location='args')
+query_parser.add_argument(
+    'table', type=str, required=True,
+    choices=('Student', 'Teacher', 'Project'),
+    help='查询的目标表，如 Student、Teacher、Project',
+    location='args'
+)
+
+query_parser.add_argument(
+    'filters', type=str, required=False,
+    help='字段字典（JSON 字符串），如 {"name":"张三","email":"hfut"}',
+    location='args'
+)
 
 
 # decimal类型转换
