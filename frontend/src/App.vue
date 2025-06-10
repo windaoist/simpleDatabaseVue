@@ -26,10 +26,9 @@ async function handleLogin() {
     ElMessage.error('用户名，密码或类别不能为空')
     return
   }
-  // 模拟登录成功
   try {
     const response = await request.post('/auth/login', account.value)
-    localStorage.setItem('jwt_token', response.data.token)
+    localStorage.setItem('jwt_token', response.data.data.token)
     LoggedIn.value = true
   } catch (error) {
     console.error('登录失败', error.message)
