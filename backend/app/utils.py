@@ -1,6 +1,7 @@
 # from app.database import get_db_connection
 from functools import wraps
 from flask import request
+from app.database import get_db_connection
 import jwt
 import os
 
@@ -48,24 +49,26 @@ COLUMN_MAPPING = {
 
 
 # 获取研究领域列表
-# def get_fields():
-#     connection = get_db_connection()
-#     cursor = connection.cursor()
-#     cursor.execute("SELECT id, research_field FROM ResearchFields")
-#     fields = cursor.fetchall()
-#     cursor.close()
-#     connection.close()
+def get_fields():
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, research_field FROM ResearchFields")
+    fields = cursor.fetchall()
+    cursor.close()
+    connection.close()
 
-#     return fields
+    return fields
 
 
 def get_related_data_api(cursor, table, field_ids):
     """
     使用 SQL 查询相关表的研究领域匹配数据
     """
-    related_data = {'related_students': [], 'related_teachers': [], 'related_projects': []}
+    related_data = {'related_students': [],
+                    'related_teachers': [], 'related_projects': []}
 
-    fields = {'Student': 'research_field', 'Teacher': 'research_field', 'Project': 'research_field'}
+    fields = {'Student': 'research_field',
+              'Teacher': 'research_field', 'Project': 'research_field'}
 
     for related_table, col in fields.items():
         if related_table == table:
