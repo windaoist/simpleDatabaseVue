@@ -65,9 +65,9 @@ def import_student_data(file):
     cursor = connection.cursor()
 
     # 清空旧数据
-    cursor.execute("TRUNCATE TABLE Student")
     cursor.execute("TRUNCATE TABLE StudentProject")
     cursor.execute("TRUNCATE TABLE StudentResearchField")
+    cursor.execute("TRUNCATE TABLE Student")
 
     duplicates = set()
     inserted_count = 0
