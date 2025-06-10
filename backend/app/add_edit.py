@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 from flask_restx import Resource, fields, Namespace, reqparse
-from app.utils import auth_required
+from app.utils import auth_required, api_response
 from app.database import get_db_connection
 from flask_jwt_extended import get_jwt_identity, get_jwt
 
@@ -61,11 +61,6 @@ delete_parser.add_argument('key', type=str, required=True, help='主键值', loc
 edit_parser = reqparse.RequestParser()
 edit_parser.add_argument('table', type=str, required=True, help='表名', location='json')
 edit_parser.add_argument('old_key', type=str, required=True, help='原主键ID', location='json')
-
-
-def api_response(success, message, data=None, status=200):
-    """统一API响应格式"""
-    return {'success': success, 'message': message, 'data': data}, status
 
 
 @ns.route('/add')

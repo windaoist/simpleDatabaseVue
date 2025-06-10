@@ -162,7 +162,7 @@ END$$
 DELIMITER ;
 
 
--- 重建科研项目视图，适配多研究领域结构
+-- 科研项目查询视图
 CREATE OR REPLACE VIEW view_project AS
 SELECT
     p.project_id,
@@ -196,3 +196,40 @@ LEFT JOIN TeacherProject tp ON p.project_id = tp.project_id
 LEFT JOIN Teacher t ON tp.teacher_id = t.teacher_id
 GROUP BY p.project_id;
 
+
+-- 学生查询视图
+CREATE OR REPLACE VIEW view_student AS
+SELECT
+    s.student_id,
+    s.name,
+    s.gender,
+    s.grade,
+    s.major,
+    s.class,
+    s.phone,
+    s.email,
+    GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field
+FROM Student s
+LEFT JOIN StudentResearchField srf ON s.student_id = srf.student_id
+LEFT JOIN ResearchFields rf ON srf.field_id = rf.id
+GROUP BY s.student_id;
+
+
+-- 教职工查询视图
+CREATE OR REPLACE VIEW view_teacher AS
+SELECT
+    t.teacher_id,
+    t.name,
+    t.gender,
+    t.title,
+    t.college,
+    t.department,
+    t.phone,
+    t.email,
+    t.office_location,
+    t.introduction,
+    GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field
+FROM Teacher t
+LEFT JOIN TeacherResearchField trf ON t.teacher_id = trf.teacher_id
+LEFT JOIN ResearchFields rf ON trf.field_id = rf.id
+GROUP BY t.teacher_id;
