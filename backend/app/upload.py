@@ -65,6 +65,7 @@ def import_student_data(file):
     cursor = connection.cursor()
 
     # 清空旧数据
+    cursor.execute("TRUNCATE VIEW view_student")
     cursor.execute("TRUNCATE TABLE StudentProject")
     cursor.execute("TRUNCATE TABLE StudentResearchField")
     cursor.execute("TRUNCATE TABLE Student")
@@ -128,6 +129,7 @@ def import_teacher_data(file):
     cursor = connection.cursor()
 
     # 清空旧数据
+    cursor.execute("TRUNCATE VIEW view_teacher")
     cursor.execute("TRUNCATE TABLE TeacherProject")
     cursor.execute("TRUNCATE TABLE TeacherResearchField")
     cursor.execute("TRUNCATE TABLE Teacher")
@@ -192,6 +194,7 @@ def import_project_data(file):
     cursor = connection.cursor()
 
     # 清空旧数据
+    cursor.execute("TRUNCATE VIEW view_project")
     cursor.execute("TRUNCATE TABLE StudentProject")
     cursor.execute("TRUNCATE TABLE TeacherProject")
     cursor.execute("TRUNCATE TABLE ProjectResearchField")

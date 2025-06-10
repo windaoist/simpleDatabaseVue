@@ -167,24 +167,18 @@ CREATE OR REPLACE VIEW view_project AS
 SELECT
     p.project_id,
     p.name AS project_name,
-
     -- 拼接多个研究领域名称（去重 + 顿号分隔）
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field,
-
     -- 负责人（顿号拼接）
     GROUP_CONCAT(DISTINCT CASE WHEN sp.role = '负责人' THEN s.name END SEPARATOR '、') AS leader_names,
-
     -- 成员（顿号拼接）
     GROUP_CONCAT(DISTINCT CASE WHEN sp.role = '成员' THEN s.name END SEPARATOR '、') AS member_names,
-
     -- 指导老师（顿号拼接）
     GROUP_CONCAT(DISTINCT t.name SEPARATOR '、') AS teacher_names,
-
     -- 状态字段
     p.project_application_status,
     p.project_approval_status,
     p.project_acceptance_status
-
 FROM Project p
 -- 连接多研究领域关系表
 LEFT JOIN ProjectResearchField prf ON p.project_id = prf.project_id
