@@ -2,7 +2,7 @@
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
 async function uploadFile(option) {
-  const { file, onProgress, onSuccess } = option
+  const { file, onProgress } = option
 
   const formData = new FormData()
   formData.append('file', file)
@@ -19,12 +19,15 @@ async function uploadFile(option) {
         }
       },
     })
-    onSuccess(response.data)
-    ElMessage.success(response.data.message || '上传成功！')
+    if (response.data) {
+      ElMessage.error(response.data.message || '上传失败，请稍后再试')
+      return
+    }
+    ElMessage.info('上传成功！')
   } catch (error) {
     // console.error(error)
     // onError(error)
-    ElMessage.error('上传失败：', error)
+    ElMessage.error('上传失败：' + error.response?.data?.message || '请稍后再试')
   }
 }
 const beforeUpload = (file) => {
@@ -48,7 +51,7 @@ const beforeUpload = (file) => {
     <div class="el-upload__text">拖动文件至此或 <em>点击上传</em></div>
     <template #tip>
       <div class="el-upload__tip">
-        上传的文件名必须为“专家库.xlsx”，“基金库.xlsx”或“项目库.xlsx”，且文件大小不超过 10MB。
+        上传的文件名必须为“学生库.xlsx”，“教职工库.xlsx”或“科研项目库.xlsx”，且文件大小不超过 10MB。
       </div>
     </template>
   </el-upload>
