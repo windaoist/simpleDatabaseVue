@@ -64,52 +64,70 @@ def import_student_data(file):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # 清空旧数据
-    cursor.execute("TRUNCATE VIEW view_student")
-    cursor.execute("TRUNCATE TABLE StudentProject")
-    cursor.execute("TRUNCATE TABLE StudentResearchField")
-    cursor.execute("TRUNCATE TABLE Student")
-
     duplicates = set()
     inserted_count = 0
 
-    for _, row in df.iterrows():
-        try:
-            student_id = row['student_id']
+    try:
+        # 禁用外键检查
+        cursor.execute("SET FOREIGN_KEY_CHECKS=0;")
 
-            cursor.execute("SELECT * FROM Student WHERE student_id=%s", (student_id, ))
-            if cursor.fetchone():
-                duplicates.add(f"重复学生学号: {student_id}")
+        # 清空旧数据
+        cursor.execute("TRUNCATE TABLE StudentProject")
+        cursor.execute("TRUNCATE TABLE StudentResearchField")
+        cursor.execute("TRUNCATE TABLE Student")
+
+        for _, row in df.iterrows():
+            try:
+                student_id = row['student_id']
+
+                cursor.execute("SELECT * FROM Student WHERE student_id=%s", (student_id, ))
+                if cursor.fetchone():
+                    duplicates.add(f"重复学生学号: {student_id}")
+                    continue
+
+                cursor.execute(
+                    "INSERT INTO Student (student_id, name, gender, grade, major, class, phone, email) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (student_id, row['name'], row['gender'], row['grade'], row['major'], row['class'], row['phone'], row['email']))
+                inserted_count += 1
+
+                # 处理研究方向（多对多插入）
+                field_names = row['research_field'].split('、') if row['research_field'] else []
+                for fname in field_names:
+                    fname = fname.strip()
+                    if not fname:
+                        continue
+                    # 查询 ID
+                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                    res = cursor.fetchone()
+                    if not res:
+                        duplicates.add(f"无效研究领域: {fname}（学生 {student_id}）")
+                        continue
+                    field_id = res['id']
+                    # 插入中间表
+                    cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, field_id) VALUES (%s, %s)", (student_id, field_id))
+
+            except Exception as e:
+                duplicates.add(f"插入失败: {student_id}，错误: {str(e)}")
                 continue
 
-            cursor.execute("INSERT INTO Student (student_id, name, gender, grade, major, class, phone, email) "
-                           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                           (student_id, row['name'], row['gender'], row['grade'], row['major'], row['class'], row['phone'], row['email']))
-            inserted_count += 1
+        connection.commit()
 
-            # 处理研究方向（多对多插入）
-            field_names = row['research_field'].split('、') if row['research_field'] else []
-            for fname in field_names:
-                fname = fname.strip()
-                if not fname:
-                    continue
-                # 查询 ID
-                cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
-                res = cursor.fetchone()
-                if not res:
-                    duplicates.add(f"无效研究领域: {fname}（学生 {student_id}）")
-                    continue
-                field_id = res['id']
-                # 插入中间表
-                cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, field_id) VALUES (%s, %s)", (student_id, field_id))
-
-        except Exception as e:
-            duplicates.add(f"插入失败: {student_id}，错误: {str(e)}")
-            continue
-
-    connection.commit()
-    cursor.close()
-    connection.close()
+    except Exception as e:
+        connection.rollback()  # 如果发生错误，回滚事务
+        # 对于 TRUNCATE 之后的错误，rollback 的意义不大，因为 TRUNCATE 通常是 DDL，会隐式提交。
+        # 但对于 INSERT 过程中的错误，rollback 是有意义的。
+        # 将错误信息添加到 duplicates 或重新抛出
+        message = f'导入学生数据过程中发生严重错误: {str(e)}'
+        return {'message': message, 'duplicates': list(duplicates)}
+    finally:
+        # 重新启用外键检查
+        if cursor:  # 确保cursor存在
+            cursor.execute("SET FOREIGN_KEY_CHECKS=1;")
+        if connection:  # 确保connection存在
+            if cursor:  # 确保cursor存在
+                cursor.close()
+            connection.close()
 
     message = f'成功导入 {inserted_count} 条学生数据'
     if duplicates:
@@ -128,53 +146,66 @@ def import_teacher_data(file):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # 清空旧数据
-    cursor.execute("TRUNCATE VIEW view_teacher")
-    cursor.execute("TRUNCATE TABLE TeacherProject")
-    cursor.execute("TRUNCATE TABLE TeacherResearchField")
-    cursor.execute("TRUNCATE TABLE Teacher")
-
     duplicates = set()
     inserted_count = 0
 
-    for _, row in df.iterrows():
-        try:
-            teacher_id = row['teacher_id']
+    try:
+        cursor.execute("SET FOREIGN_KEY_CHECKS=0;")
+        # 清空旧数据
+        cursor.execute("TRUNCATE TABLE TeacherProject")
+        cursor.execute("TRUNCATE TABLE TeacherResearchField")
+        cursor.execute("TRUNCATE TABLE Teacher")
 
-            cursor.execute("SELECT * FROM Teacher WHERE teacher_id=%s", (teacher_id, ))
-            if cursor.fetchone():
-                duplicates.add(f"重复教职工号: {teacher_id}")
+        for _, row in df.iterrows():
+            try:
+                teacher_id = row['teacher_id']
+
+                cursor.execute("SELECT * FROM Teacher WHERE teacher_id=%s", (teacher_id, ))
+                if cursor.fetchone():
+                    duplicates.add(f"重复教职工号: {teacher_id}")
+                    continue
+
+                cursor.execute(
+                    "INSERT INTO Teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (teacher_id, row['name'], row['gender'], row['title'], row['college'], row['department'], row['phone'], row['email'],
+                     row['office_location'], row['introduction']))
+                inserted_count += 1
+
+                # 处理研究方向（多对多插入）
+                field_names = row['research_field'].split('、') if row['research_field'] else []
+                for fname in field_names:
+                    fname = fname.strip()
+                    if not fname:
+                        continue
+                    # 查询 ID
+                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                    res = cursor.fetchone()
+                    if not res:
+                        duplicates.add(f"无效研究领域: {fname}（教师 {teacher_id}）")
+                        continue
+                    field_id = res['id']
+                    # 插入中间表
+                    cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, field_id) VALUES (%s, %s)", (teacher_id, field_id))
+
+            except Exception as e:
+                duplicates.add(f"插入失败: {teacher_id}，错误: {str(e)}")
                 continue
 
-            cursor.execute(
-                "INSERT INTO Teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (teacher_id, row['name'], row['gender'], row['title'], row['college'], row['department'],
-                                                                        row['phone'], row['email'], row['office_location'], row['introduction']))
-            inserted_count += 1
+        connection.commit()
 
-            # 处理研究方向（多对多插入）
-            field_names = row['research_field'].split('、') if row['research_field'] else []
-            for fname in field_names:
-                fname = fname.strip()
-                if not fname:
-                    continue
-                # 查询 ID
-                cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
-                res = cursor.fetchone()
-                if not res:
-                    duplicates.add(f"无效研究领域: {fname}（教师 {teacher_id}）")
-                    continue
-                field_id = res['id']
-                # 插入中间表
-                cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, field_id) VALUES (%s, %s)", (teacher_id, field_id))
-
-        except Exception as e:
-            duplicates.add(f"插入失败: {teacher_id}，错误: {str(e)}")
-            continue
-
-    connection.commit()
-    cursor.close()
-    connection.close()
+    except Exception as e:
+        connection.rollback()
+        message = f'导入教职工数据过程中发生严重错误: {str(e)}'
+        return {'message': message, 'duplicates': list(duplicates)}
+    finally:
+        # 重新启用外键检查
+        if cursor:  # 确保cursor存在
+            cursor.execute("SET FOREIGN_KEY_CHECKS=1;")
+        if connection:  # 确保connection存在
+            if cursor:  # 确保cursor存在
+                cursor.close()
+            connection.close()
 
     message = f"成功导入 {inserted_count} 条教职工数据"
     if duplicates:
@@ -193,76 +224,88 @@ def import_project_data(file):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # 清空旧数据
-    cursor.execute("TRUNCATE VIEW view_project")
-    cursor.execute("TRUNCATE TABLE StudentProject")
-    cursor.execute("TRUNCATE TABLE TeacherProject")
-    cursor.execute("TRUNCATE TABLE ProjectResearchField")
-    cursor.execute("TRUNCATE TABLE Project")
-
     duplicates = set()
     inserted_count = 0
 
-    for _, row in df.iterrows():
-        try:
-            project_id = row['project_id']
+    try:
+        cursor.execute("SET FOREIGN_KEY_CHECKS=0;")
+        # 清空旧数据
+        cursor.execute("TRUNCATE TABLE StudentProject")
+        cursor.execute("TRUNCATE TABLE TeacherProject")
+        cursor.execute("TRUNCATE TABLE ProjectResearchField")
+        cursor.execute("TRUNCATE TABLE Project")
 
-            cursor.execute("SELECT * FROM Project WHERE project_id=%s", (project_id, ))
-            if cursor.fetchone():
-                duplicates.add(f"重复项目编号: {project_id}")
+        for _, row in df.iterrows():
+            try:
+                project_id = row['project_id']
+
+                cursor.execute("SELECT * FROM Project WHERE project_id=%s", (project_id, ))
+                if cursor.fetchone():
+                    duplicates.add(f"重复项目编号: {project_id}")
+                    continue
+
+                cursor.execute(
+                    "INSERT INTO Project (project_id, name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)", (project_id, row['name'], row['project_content'], row['project_application_status'],
+                                                        row['project_approval_status'], row['project_acceptance_status']))
+                inserted_count += 1
+
+                # 处理研究方向（多对多插入）
+                field_names = row['research_field'].split('、') if row['research_field'] else []
+                for fname in field_names:
+                    fname = fname.strip()
+                    if not fname:
+                        continue
+                    # 查询 ID
+                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                    res = cursor.fetchone()
+                    if not res:
+                        duplicates.add(f"无效研究领域: {fname}（项目 {project_id}）")
+                        continue
+                    field_id = res['id']
+                    # 插入中间表
+                    cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, field_id) VALUES (%s, %s)", (project_id, field_id))
+
+                # 插入负责人（学生，最多1个）
+                leader_ids = [s.strip() for s in row.get('负责人学号', '').split('、') if s.strip()]
+                if leader_ids:
+                    student_id = leader_ids[0]  # 只取第一个
+                    cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (student_id, ))
+                    if cursor.fetchone():
+                        cursor.execute("INSERT IGNORE INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (student_id, project_id))
+
+                # 插入成员（学生，最多4个）
+                member_ids = [s.strip() for s in row.get('成员学号', '').split('、') if s.strip()]
+                for student_id in member_ids[:4]:  # 最多取前4个
+                    cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (student_id, ))
+                    if cursor.fetchone():
+                        cursor.execute("INSERT IGNORE INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (student_id, project_id))
+
+                # 插入指导教师（最多2个）
+                teacher_ids = [t.strip() for t in row.get('指导教师工号', '').split('、') if t.strip()]
+                for teacher_id in teacher_ids[:2]:  # 最多取前2个
+                    cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id = %s", (teacher_id, ))
+                    if cursor.fetchone():
+                        cursor.execute("INSERT IGNORE INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (teacher_id, project_id))
+
+            except Exception as e:
+                duplicates.add(f"插入失败: {project_id}，错误: {str(e)}")
                 continue
 
-            cursor.execute(
-                "INSERT INTO Project (project_id, name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
-                "VALUES (%s, %s, %s, %s, %s, %s)", (project_id, row['name'], row['project_content'], row['project_application_status'],
-                                                    row['project_approval_status'], row['project_acceptance_status']))
-            inserted_count += 1
+        connection.commit()
 
-            # 处理研究方向（多对多插入）
-            field_names = row['research_field'].split('、') if row['research_field'] else []
-            for fname in field_names:
-                fname = fname.strip()
-                if not fname:
-                    continue
-                # 查询 ID
-                cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
-                res = cursor.fetchone()
-                if not res:
-                    duplicates.add(f"无效研究领域: {fname}（项目 {project_id}）")
-                    continue
-                field_id = res['id']
-                # 插入中间表
-                cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, field_id) VALUES (%s, %s)", (project_id, field_id))
-
-            # 插入负责人（学生，最多1个）
-            leader_ids = [s.strip() for s in row.get('负责人学号', '').split('、') if s.strip()]
-            if leader_ids:
-                student_id = leader_ids[0]  # 只取第一个
-                cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (student_id, ))
-                if cursor.fetchone():
-                    cursor.execute("INSERT IGNORE INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (student_id, project_id))
-
-            # 插入成员（学生，最多4个）
-            member_ids = [s.strip() for s in row.get('成员学号', '').split('、') if s.strip()]
-            for student_id in member_ids[:4]:  # 最多取前4个
-                cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (student_id, ))
-                if cursor.fetchone():
-                    cursor.execute("INSERT IGNORE INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (student_id, project_id))
-
-            # 插入指导教师（最多2个）
-            teacher_ids = [t.strip() for t in row.get('指导教师工号', '').split('、') if t.strip()]
-            for teacher_id in teacher_ids[:2]:  # 最多取前2个
-                cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id = %s", (teacher_id, ))
-                if cursor.fetchone():
-                    cursor.execute("INSERT IGNORE INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (teacher_id, project_id))
-
-        except Exception as e:
-            duplicates.add(f"插入失败: {project_id}，错误: {str(e)}")
-            continue
-
-    connection.commit()
-    cursor.close()
-    connection.close()
+    except Exception as e:
+        connection.rollback()
+        message = f'导入科研项目数据过程中发生严重错误: {str(e)}'
+        return {'message': message, 'duplicates': list(duplicates)}
+    finally:
+        # 重新启用外键检查
+        if cursor:  # 确保cursor存在
+            cursor.execute("SET FOREIGN_KEY_CHECKS=1;")
+        if connection:  # 确保connection存在
+            if cursor:  # 确保cursor存在
+                cursor.close()
+            connection.close()
 
     message = f'成功导入 {inserted_count} 条科研项目数据'
     if duplicates:
