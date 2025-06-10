@@ -1,125 +1,127 @@
-# from app.database import get_db_connection
-from functools import wraps
-from flask import request
-from database import get_db_connection
-import jwt
-import os
+from app.database import get_db_connection
 
 # 表头映射字典
 COLUMN_MAPPING = {
     'id': '序号',
-    'research_field': '研究领域',
-    'project_id': '项目编号',
     'project_name': '项目名称',
+    'project_status': '项目状态',
+    'industry_chain': '所属产业链',
     'project_content': '项目内容',
-    'leader_names': '负责人',
-    'member_names': '成员',
-    'teacher_names': '指导老师',
-    'project_application_status': '申报状态',
-    'project_approval_status': '审批状态',
-    'project_acceptance_status': '验收状态',
-    'student_id': '学生学号',
-    'name': '姓名',
-    'gender': '性别',
-    'grade': '年级',
-    'major': '专业',
-    'class': '班级',
-    'phone': '联系电话',
-    'email': '电子邮箱',
-    'teacher_id': '教职工号',
-    'title': '职称',
-    'college': '所属学院',
-    'department': '所属专业',
-    'office_location': '办公地点',
-    'introduction': '个人简介'
+    'investor': '投资方',
+    'investment_amount': '投资额',
+    'financing_amount': '融资额',
+    'equity_financing': '股权融资',
+    'debt_financing': '债权融资',
+    'project_progress': '项目进展及资本对接情况',
+    'location': '落地区域',
+    'contact_person': '联系人',
+    'phone': '电话',
+    'contact_phone': '联系方式',
+    'fund_name': '基金名称',
+    'management_agency': '管理机构',
+    'investment_area': '投资领域',
+    'fundraising_amount': '募资规模',
+    'total_investment': '投资总金额',
+    'expert_name': '专家',
+    'industry_category': '产业类别',
+    'specific_industry': '具体产业',
+    'agency_name': '机构名称'
 }
 
 
-# # 获取ID
-# def get_field_id(research_field):
-#     connection = get_db_connection()
-#     cursor = connection.cursor()
-#     cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (research_field, ))
-#     result = cursor.fetchone()
-#     cursor.close()
-#     connection.close()
-#     if result:
-#         return result['id']
-#     return None
-
-
-# 获取研究领域列表
-def get_fields():
+# 获取产业ID
+def get_industry_id(industry_name):
     connection = get_db_connection()
     cursor = connection.cursor()
-    cursor.execute("SELECT id, research_field FROM ResearchFields")
-    fields = cursor.fetchall()
+    cursor.execute(
+        "SELECT id FROM KeyIndustries WHERE industry_name = %s", (industry_name, ))
+    result = cursor.fetchone()
+    cursor.close()
+    connection.close()
+    if result:
+        return result['id']
+    return None
+
+
+# 获取产业列表
+def get_industries():
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, industry_name FROM KeyIndustries")
+    industries = cursor.fetchall()
     cursor.close()
     connection.close()
 
-    return fields
+    return industries
+
+# Assuming COLUMN_MAPPING and get_db_connection are available here if not passed explicitly
 
 
-def get_related_data_api(cursor, table, field_ids):
+def get_related_data_api(cursor, industry_mapping, current_table_name, industry_id_value):
     """
-    使用 SQL 查询相关表的研究领域匹配数据
+    获取相关数据 (API Version)
+    :param cursor: 数据库游标
+    :param industry_mapping: 预先获取的产业ID到名称的映射
+    :param current_table_name: 当前查询的主表名 (e.g., 'Expert')
+    :param industry_id_value: 要匹配的产业ID值
+    :return: 包含相关数据的字典
     """
-    related_data = {'related_students': [],
-                    'related_teachers': [], 'related_projects': []}
+    # 定义要查询的表及其相应的产业列名 (数据库中的列名)
+    # 这些应该是你的数据库中实际存储产业ID的列名
+    table_to_industry_column_map = {
+        "Expert": "specific_industry",  # 假设这是Expert表中存储产业ID的列
+        "Project": "industry_chain",   # 假设这是Project表中存储产业ID的列
+        "Fund": "investment_area"      # 假设这是Fund表中存储产业ID的列
+    }
 
-    fields = {'Student': 'research_field',
-              'Teacher': 'research_field', 'Project': 'research_field'}
+    related_data_results = {
+        "related_experts": [],
+        "related_projects": [],
+        "related_funds": []
+    }
 
-    for related_table, col in fields.items():
-        if related_table == table:
-            continue  # 跳过主表
+    if not industry_id_value:  # 如果没有提供产业ID，则不查找相关数据
+        return related_data_results
 
-        placeholders = ', '.join(['%s'] * len(field_ids))
-        sql = f"SELECT * FROM {related_table} WHERE {col} IN ({placeholders})"
+    for table_name_to_query, actual_industry_column_name in table_to_industry_column_map.items():
+        if table_name_to_query == current_table_name:
+            continue  # 跳过当前正在查询的主表
 
+        # 构建查询语句
+        # 重要: 确保 industry_id_value 是正确的类型 (通常是整数) for the query
+        query = f"SELECT * FROM {table_name_to_query} WHERE {actual_industry_column_name} = %s"
         try:
-            cursor.execute(sql, field_ids)
-            rows = cursor.fetchall()
-            for idx, row in enumerate(rows, 1):
-                row = dict(row)
-                row['序号'] = idx
-                related_data[f'related_{related_table.lower()}s'].append(row)
+            cursor.execute(query, (industry_id_value,))
+            results_for_table = cursor.fetchall()
         except Exception as e:
-            print(f"关联查询 {related_table} 出错: {e}")
-            continue
+            print(
+                f"Error querying related data for {table_name_to_query}: {e}")
+            continue  # 如果查询失败，跳到下一个表
 
-    return related_data
+        processed_results_for_table = []
+        for idx, item_row in enumerate(results_for_table, start=1):
+            # 1. 添加序号
+            processed_item = {'序号': idx}
+            processed_item.update(item_row)  # 合并原始数据
 
+            # 2. 映射产业ID为名称
+            if actual_industry_column_name in processed_item:
+                processed_item[actual_industry_column_name] = industry_mapping.get(
+                    processed_item[actual_industry_column_name], f"未知产业ID: {processed_item[actual_industry_column_name]}"
+                )
 
-SECRET_KEY = os.environ.get("JWT_SECRET", "my_jwt_secret")
+            # 3. 映射表头 (数据库列名 -> 显示名称)
+            final_mapped_item = {
+                COLUMN_MAPPING.get(db_col, db_col): val
+                for db_col, val in processed_item.items()
+            }
+            processed_results_for_table.append(final_mapped_item)
 
+        if table_name_to_query == "Expert":
+            related_data_results["related_experts"] = processed_results_for_table
+        elif table_name_to_query == "Project":
+            related_data_results["related_projects"] = processed_results_for_table
+        elif table_name_to_query == "Fund":
+            related_data_results["related_funds"] = processed_results_for_table
 
-def auth_required(roles=None):
-
-    def decorator(func):
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            auth_header = request.headers.get('Authorization')
-            if not auth_header or not auth_header.startswith('Bearer '):
-                return {'success': False, 'message': '未提供有效的身份令牌'}, 401
-
-            token = auth_header.split(" ")[1]
-            try:
-                payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-                user_role = payload.get('role')
-                if roles and user_role not in roles:
-                    return {'success': False, 'message': '权限不足'}, 403
-
-                # 可选：注入用户信息供后续使用
-                request.user = payload
-                return func(*args, **kwargs)
-
-            except jwt.ExpiredSignatureError:
-                return {'success': False, 'message': '令牌已过期'}, 401
-            except jwt.InvalidTokenError:
-                return {'success': False, 'message': '无效令牌'}, 401
-
-        return wrapper
-
-    return decorator
+    return related_data_results
