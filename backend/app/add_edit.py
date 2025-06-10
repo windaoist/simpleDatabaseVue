@@ -1,96 +1,92 @@
 from flask import Blueprint, request
 from flask_restx import Resource, fields, Namespace, reqparse
-from app.utils import get_industry_id, get_industries
+from app.utils import auth_required
 from app.database import get_db_connection
+from flask_jwt_extended import get_jwt_identity, get_jwt
 
 # 创建蓝图和 API 实例
 add_edit_bp = Blueprint('add_edit', __name__)
-# api = Api(
-#     add_edit_bp,
-#     title='数据管理 API',
-#     version='1.0',
-#     description='用于添加、编辑和删除专家、项目和基金数据的API',
-#     doc='/swagger/'  # Swagger UI 访问路径
-# )
 
 # 创建命名空间
 ns = Namespace('data', path='/', description='数据操作接口')
 
-# 请求模型定义
-expert_model = ns.model('Expert', {
-    'expert_name': fields.String(required=True, description='专家姓名'),
-    'industry_category': fields.String(required=True, description='行业类别'),
-    'specific_industry': fields.String(required=True, description='具体行业'),
-    'fund_name': fields.String(required=True, description='基金名称'),
-    'agency_name': fields.String(required=True, description='机构名称')
-})
+# 教职工模型
+teacher_model = ns.model(
+    'Teacher', {
+        'teacher_id': fields.String(required=True, description='教职工号'),
+        'name': fields.String(required=True, description='姓名'),
+        'gender': fields.String(description='性别，男或女'),
+        'title': fields.String(description='职称'),
+        'college': fields.String(description='所属学院'),
+        'department': fields.String(description='所属专业'),
+        'research_field': fields.String(description='研究领域，多个用顿号分隔'),
+        'phone': fields.String(description='联系电话'),
+        'email': fields.String(description='电子邮箱'),
+        'office_location': fields.String(description='办公地点'),
+        'introduction': fields.String(description='个人简介')
+    })
 
-project_model = ns.model('Project', {
-    'project_name': fields.String(required=True, description='项目名称'),
-    'project_status': fields.String(required=True, description='项目状态'),
-    'industry_chain': fields.String(required=True, description='产业链'),
-    'project_content': fields.String(required=True, description='项目内容'),
-    'investor': fields.String(description='投资者'),
-    'investment_amount': fields.Float(description='投资金额'),
-    'financing_amount': fields.Float(description='融资总额'),
-    'equity_financing': fields.Float(description='股权融资'),
-    'debt_financing': fields.Float(description='债权融资'),
-    'project_progress': fields.String(description='项目进展'),
-    'location': fields.String(description='所在地'),
-    'contact_person': fields.String(description='联系人'),
-    'contact_phone': fields.String(description='联系电话')
-})
+# 学生模型
+student_model = ns.model(
+    'Student', {
+        'student_id': fields.String(required=True, description='学生学号'),
+        'name': fields.String(required=True, description='姓名'),
+        'gender': fields.String(description='性别，男或女'),
+        'grade': fields.String(description='年级'),
+        'major': fields.String(description='专业'),
+        'class': fields.String(description='班级'),
+        'research_field': fields.String(description='研究领域，多个用顿号分隔'),
+        'phone': fields.String(description='联系电话'),
+        'email': fields.String(description='电子邮箱')
+    })
 
-fund_model = ns.model('Fund', {
-    'fund_name': fields.String(required=True, description='基金名称'),
-    'management_agency': fields.String(required=True, description='管理机构'),
-    'investment_area': fields.String(required=True, description='投资领域'),
-    'contact_person': fields.String(required=True, description='联系人'),
-    'phone': fields.String(required=True, description='联系电话'),
-    'fundraising_amount': fields.Float(description='募资总额'),
-    'total_investment': fields.Float(description='总投资额')
-})
+# 科研项目模型
+project_model = ns.model(
+    'Project', {
+        'project_id': fields.String(required=True, description='项目编号'),
+        'name': fields.String(required=True, description='项目名称'),
+        'research_field': fields.String(required=True, description='研究领域，多个用顿号分隔'),
+        '负责人学号': fields.String(description='负责人学号，仅1个'),
+        '成员学号': fields.String(description='成员学号，最多4个，用顿号分隔'),
+        '指导教师工号': fields.String(description='指导教师工号，最多2个，用顿号分隔'),
+        'project_content': fields.String(description='项目内容')
+    })
 
 # 删除操作解析器
 delete_parser = reqparse.RequestParser()
-delete_parser.add_argument(
-    'table', type=str, required=True, help='表名', location='json')
-delete_parser.add_argument(
-    'key1', type=str, required=True, help='主键1', location='json')
-delete_parser.add_argument(
-    'key2', type=str, required=True, help='主键2', location='json')
+delete_parser.add_argument('table', type=str, required=True, help='表名', location='json')
+delete_parser.add_argument('key', type=str, required=True, help='主键值', location='json')
 
-# 编辑操作解析器
+# 编辑操作解析器（更新为单主键结构）
 edit_parser = reqparse.RequestParser()
-edit_parser.add_argument(
-    'table', type=str, required=True, help='表名', location='json')
-edit_parser.add_argument('old_key1', type=str,
-                         required=True, help='原主键1', location='json')
-edit_parser.add_argument('old_key2', type=str,
-                         required=True, help='原主键2', location='json')
+edit_parser.add_argument('table', type=str, required=True, help='表名', location='json')
+edit_parser.add_argument('old_key', type=str, required=True, help='原主键ID', location='json')
 
 
 def api_response(success, message, data=None, status=200):
     """统一API响应格式"""
-    return {
-        'success': success,
-        'message': message,
-        'data': data
-    }, status
+    return {'success': success, 'message': message, 'data': data}, status
 
 
 @ns.route('/add')
 class AddData(Resource):
-    @ns.expect(ns.model('AddRequest', {
-        'table': fields.String(required=True, enum=['Expert', 'Project', 'Fund'], description='表名'),
-        'data': fields.Raw(required=True, description='数据内容')
-    }))
+
+    @ns.expect(
+        ns.model('AddRequest', {
+            'table': fields.String(required=True, enum=['Student', 'Teacher', 'Project'], description='表名'),
+            'data': fields.Raw(required=True, description='数据内容')
+        }))
     @ns.response(200, '添加成功')
     @ns.response(400, '请求数据格式错误')
+    @ns.response(403, '权限不足')
     @ns.response(409, '数据已存在')
     @ns.response(500, '数据库错误')
+    @auth_required(roles=['Admin', 'Teacher', 'Student'])
     def post(self):
         """添加新数据"""
+        user_id = get_jwt_identity()
+        role = get_jwt().get('role')
+
         data = request.get_json()
         if not data:
             return api_response(False, '请求数据格式错误', status=400)
@@ -105,82 +101,141 @@ class AddData(Resource):
         response_data = {'table': table}
 
         try:
-            if table == 'Expert':
-                required_fields = ['expert_name', 'industry_category',
-                                   'specific_industry', 'fund_name', 'agency_name']
+            if table == 'Student':
+                if role != 'Admin':
+                    return api_response(False, '仅管理员可添加学生信息', status=403)
+
+                required_fields = ['student_id', 'name']
                 if not all(field in record_data for field in required_fields):
                     return api_response(False, '缺少必要字段', status=400)
 
                 # 检查重复项
-                cursor.execute(
-                    "SELECT * FROM Expert WHERE expert_name=%s AND specific_industry=%s",
-                    (record_data['expert_name'],
-                     record_data['specific_industry'])
-                )
+                cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (record_data['student_id'], ))
                 if cursor.fetchone():
-                    return api_response(False, '专家已存在', {'type': 'duplicate'}, 409)
+                    return api_response(False, '该学生已存在', {'type': 'duplicate'}, 409)
 
-                # 插入新专家
+                # 插入学生表
+                cursor.execute("INSERT INTO Student (student_id, name, gender, grade, major, class, phone, email) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                               (record_data['student_id'], record_data['name'], record_data.get('gender', ''), record_data.get('grade', ''),
+                                record_data.get('major', ''), record_data.get('class', ''), record_data.get('phone', ''), record_data.get('email', '')))
+
+                # 插入研究领域关联表
+                field_names = record_data.get('research_field', '')
+                if field_names:
+                    fields = [f.strip() for f in field_names.split('、') if f.strip()]
+                    for fname in fields:
+                        cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                        row = cursor.fetchone()
+                        if row:
+                            cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, field_id) VALUES (%s, %s)",
+                                           (record_data['student_id'], row['id']))
+
+                response_data['record'] = {'student_id': record_data['student_id']}
+
+            elif table == 'Teacher':
+                if role != 'Admin':
+                    return api_response(False, '仅管理员可添加教师信息', status=403)
+
+                required_fields = ['teacher_id', 'name']
+                if not all(field in record_data for field in required_fields):
+                    return api_response(False, '缺少必要字段', status=400)
+
+                # 检查重复项
+                cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id = %s", (record_data['teacher_id'], ))
+                if cursor.fetchone():
+                    return api_response(False, '该教师已存在', {'type': 'duplicate'}, 409)
+
+                # 插入教师表
                 cursor.execute(
-                    "INSERT INTO Expert (expert_name, industry_category, specific_industry, fund_name, agency_name) VALUES (%s, %s, %s, %s, %s)",
-                    (record_data['expert_name'], record_data['industry_category'],
-                     record_data['specific_industry'], record_data['fund_name'], record_data['agency_name'])
-                )
-                response_data['record'] = {
-                    'expert_name': record_data['expert_name']}
+                    "INSERT INTO Teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (record_data['teacher_id'], record_data['name'], record_data.get('gender', ''), record_data.get('title', ''), record_data.get(
+                        'college', ''), record_data.get('department', ''), record_data.get('phone', ''), record_data.get(
+                            'email', ''), record_data.get('office_location', ''), record_data.get('introduction', '')))
+
+                # 插入研究领域
+                field_names = record_data.get('research_field', '')
+                if field_names:
+                    fields = [f.strip() for f in field_names.split('、') if f.strip()]
+                    for fname in fields:
+                        cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                        row = cursor.fetchone()
+                        if row:
+                            cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, field_id) VALUES (%s, %s)",
+                                           (record_data['teacher_id'], row['id']))
+
+                response_data['record'] = {'teacher_id': record_data['teacher_id']}
 
             elif table == 'Project':
-                # 项目数据验证和插入逻辑
-                required_fields = ['project_name', 'project_status',
-                                   'industry_chain', 'project_content']
+                required_fields = ['project_id', 'name', 'project_content']
                 if not all(field in record_data for field in required_fields):
                     return api_response(False, '缺少必要字段', status=400)
 
-                # 检查重复项
-                cursor.execute(
-                    "SELECT * FROM Project WHERE project_name=%s AND industry_chain=%s",
-                    (record_data['project_name'],
-                     record_data['industry_chain'])
-                )
+                project_id = record_data['project_id']
+                cursor.execute("SELECT 1 FROM Project WHERE project_id=%s", (project_id, ))
                 if cursor.fetchone():
                     return api_response(False, '项目已存在', {'type': 'duplicate'}, 409)
 
-                # 插入新项目
-                cursor.execute(
-                    "INSERT INTO Project (project_name, industry_chain, project_status, project_content, investor, investment_amount, financing_amount, equity_financing, debt_financing, project_progress, location, contact_person, contact_phone) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (record_data['project_name'], record_data['industry_chain'], record_data['project_status'], record_data['project_content'],
-                     record_data.get('investor', ''), record_data.get(
-                         'investment_amount', 0), record_data.get('financing_amount', 0),
-                     record_data.get('equity_financing', 0), record_data.get(
-                         'debt_financing', 0), record_data.get('project_progress', ''),
-                     record_data.get('location', ''), record_data.get('contact_person', ''), record_data.get('contact_phone', ''))
-                )
-                response_data['record'] = {
-                    'project_name': record_data['project_name']}
+                # 权限校验逻辑
+                leader_ids = [s.strip() for s in record_data.get('负责人学号', '').split('、') if s.strip()]
+                member_ids = [s.strip() for s in record_data.get('成员学号', '').split('、') if s.strip()]
+                teacher_ids = [t.strip() for t in record_data.get('指导教师工号', '').split('、') if t.strip()]
 
-            elif table == 'Fund':
-                # 基金数据验证和插入逻辑
-                required_fields = ['fund_name', 'management_agency',
-                                   'investment_area', 'contact_person', 'phone']
-                if not all(field in record_data for field in required_fields):
-                    return api_response(False, '缺少必要字段', status=400)
+                if role == 'Student':
+                    # 学生如果是负责人
+                    if user_id in leader_ids:
+                        cursor.execute("SELECT COUNT(*) FROM StudentProject WHERE student_id=%s AND role='负责人'", (user_id, ))
+                        count = cursor.fetchone()[0]
+                        if count >= 1:
+                            return api_response(False, '您已作为负责人参与一个项目，不能再次创建', status=403)
 
-                # 检查重复项
-                cursor.execute(
-                    "SELECT * FROM Fund WHERE fund_name=%s AND investment_area=%s",
-                    (record_data['fund_name'], record_data['investment_area'])
-                )
-                if cursor.fetchone():
-                    return api_response(False, '基金已存在', {'type': 'duplicate'}, 409)
+                    # 学生如果是成员
+                    if user_id in member_ids:
+                        cursor.execute("SELECT COUNT(*) FROM StudentProject WHERE student_id=%s AND role='成员'", (user_id, ))
+                        count = cursor.fetchone()[0]
+                        if count >= 2:
+                            return api_response(False, '您已作为成员参与两个项目，不能再参与更多', status=403)
 
-                # 插入新基金
+                if role == 'Teacher':
+                    if user_id in teacher_ids:
+                        cursor.execute("SELECT COUNT(*) FROM TeacherProject WHERE teacher_id=%s", (user_id, ))
+                        count = cursor.fetchone()[0]
+                        if count >= 2:
+                            return api_response(False, '您已作为指导老师参与两个项目，不能再参与更多', status=403)
+
+                # 插入科研项目表
                 cursor.execute(
-                    "INSERT INTO Fund (fund_name, investment_area, management_agency, contact_person, phone, fundraising_amount, total_investment) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                    (record_data['fund_name'], record_data['investment_area'], record_data['management_agency'], record_data['contact_person'],
-                     record_data['phone'], record_data.get('fundraising_amount', 0), record_data.get('total_investment', 0))
-                )
-                response_data['record'] = {
-                    'fund_name': record_data['fund_name']}
+                    "INSERT INTO Project (project_id, name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)",
+                    (project_id, record_data['name'], record_data['project_content'], record_data.get(
+                        'project_application_status', ''), record_data.get('project_approval_status', ''), record_data.get('project_acceptance_status', '')))
+
+                # 插入研究领域关联
+                field_str = record_data.get('research_field', '')
+                field_ids = [int(fid) for fid in field_str.split('、') if fid.isdigit()]
+                for fid in field_ids:
+                    cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, field_id) VALUES (%s, %s)", (project_id, fid))
+
+                # 插入负责人（学生）
+                if leader_ids:
+                    student_id = leader_ids[0]
+                    cursor.execute("SELECT 1 FROM Student WHERE student_id=%s", (student_id, ))
+                    if cursor.fetchone():
+                        cursor.execute("INSERT IGNORE INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (student_id, project_id))
+
+                # 插入成员（学生）
+                for student_id in member_ids[:4]:
+                    cursor.execute("SELECT 1 FROM Student WHERE student_id=%s", (student_id, ))
+                    if cursor.fetchone():
+                        cursor.execute("INSERT IGNORE INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (student_id, project_id))
+
+                # 插入指导老师
+                for teacher_id in teacher_ids[:2]:
+                    cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id=%s", (teacher_id, ))
+                    if cursor.fetchone():
+                        cursor.execute("INSERT IGNORE INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (teacher_id, project_id))
+
+                response_data['record'] = {'project_id': project_id}
 
             else:
                 return api_response(False, '不支持的表名', status=400)
@@ -196,43 +251,37 @@ class AddData(Resource):
             connection.close()
 
 
-@ns.route('/industries')
-class IndustryData(Resource):
-    @ns.response(200, '行业数据获取成功')
-    @ns.response(500, '获取行业数据失败')
-    def get(self):
-        """获取所有行业数据"""
-        try:
-            industries = get_industries()
-            return api_response(True, '行业数据获取成功', {'industries': industries})
-        except Exception as e:
-            return api_response(False, f'获取行业数据失败: {str(e)}', status=500)
-
-
 @ns.route('/edit')
 class EditData(Resource):
-    @ns.expect(ns.model('EditRequest', {
-        'table': fields.String(required=True, enum=['Expert', 'Project', 'Fund'], description='表名'),
-        'old_key1': fields.String(required=True, description='原主键1'),
-        'old_key2': fields.String(required=True, description='原主键2'),
-        'data': fields.Raw(required=True, description='新数据内容')
-    }))
+
+    @ns.expect(
+        ns.model(
+            'EditRequest', {
+                'table': fields.String(required=True, enum=['Student', 'Teacher', 'Project'], description='表名'),
+                'old_key': fields.String(required=True, description='原主键'),
+                'data': fields.Raw(required=True, description='新数据内容')
+            }))
     @ns.response(200, '更新成功')
     @ns.response(400, '请求数据格式错误')
+    @ns.response(403, '权限不足')
     @ns.response(409, '数据已存在')
     @ns.response(500, '数据库错误')
+    @auth_required(roles=['Admin', 'Teacher', 'Student'])
     def post(self):
         """编辑现有数据"""
+        from flask_jwt_extended import get_jwt_identity, get_jwt
+        user_id = get_jwt_identity()
+        role = get_jwt().get('role')
+
         data = request.get_json()
         if not data:
             return api_response(False, '请求数据格式错误', status=400)
 
         table = data.get('table')
-        old_key1 = data.get('old_key1')
-        old_key2 = data.get('old_key2')
+        old_key = data.get('old_key')
         record_data = data.get('data', {})
 
-        if not table or not old_key1 or not old_key2:
+        if not table or not old_key:
             return api_response(False, '缺少必要参数', status=400)
 
         connection = get_db_connection()
@@ -240,75 +289,118 @@ class EditData(Resource):
         response_data = {'table': table}
 
         try:
-            if table == 'Expert':
-                # 专家数据更新逻辑
-                new_key1 = record_data.get('expert_name')
-                new_key2 = record_data.get('specific_industry')
+            if table == 'Student':
+                if role != 'Admin':
+                    return api_response(False, '仅管理员可编辑学生信息', status=403)
 
-                # 检查重复项（排除自身）
-                if new_key1 != old_key1 or new_key2 != old_key2:
-                    cursor.execute(
-                        "SELECT * FROM Expert WHERE expert_name=%s AND specific_industry=%s",
-                        (new_key1, new_key2)
-                    )
+                new_key = record_data.get('student_id')
+                if new_key != old_key:
+                    cursor.execute("SELECT 1 FROM Student WHERE student_id=%s", (new_key, ))
                     if cursor.fetchone():
-                        return api_response(False, '专家已存在', {'type': 'duplicate'}, 409)
+                        return api_response(False, '学号已存在', {'type': 'duplicate'}, 409)
 
-                # 更新专家数据
+                cursor.execute("UPDATE Student SET student_id=%s, name=%s, gender=%s, grade=%s, major=%s, class=%s, phone=%s, email=%s "
+                               "WHERE student_id=%s",
+                               (new_key, record_data.get('name', ''), record_data.get('gender', ''), record_data.get('grade', ''), record_data.get(
+                                   'major', ''), record_data.get('class', ''), record_data.get('phone', ''), record_data.get('email', ''), old_key))
+
+                cursor.execute("DELETE FROM StudentResearchField WHERE student_id=%s", (new_key, ))
+                research_fields = record_data.get('research_field', '').split('、')
+                for rf in research_fields:
+                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field=%s", (rf.strip(), ))
+                    row = cursor.fetchone()
+                    if row:
+                        cursor.execute("INSERT INTO StudentResearchField (student_id, field_id) VALUES (%s, %s)", (new_key, row['id']))
+                response_data['record'] = {'student_id': new_key}
+
+            elif table == 'Teacher':
+                if role != 'Admin':
+                    return api_response(False, '仅管理员可编辑教师信息', status=403)
+
+                new_key = record_data.get('teacher_id')
+                if new_key != old_key:
+                    cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id=%s", (new_key, ))
+                    if cursor.fetchone():
+                        return api_response(False, '工号已存在', {'type': 'duplicate'}, 409)
+
                 cursor.execute(
-                    "UPDATE Expert SET expert_name=%s, specific_industry=%s, industry_category=%s, fund_name=%s, agency_name=%s WHERE expert_name=%s AND specific_industry=%s",
-                    (new_key1, new_key2, record_data['industry_category'],
-                     record_data['fund_name'], record_data['agency_name'], old_key1, old_key2)
-                )
-                response_data['record'] = {'expert_name': new_key1}
+                    "UPDATE Teacher SET teacher_id=%s, name=%s, gender=%s, title=%s, college=%s, department=%s, phone=%s, email=%s, office_location=%s, introduction=%s "
+                    "WHERE teacher_id=%s", (new_key, record_data.get('name', ''), record_data.get('gender', ''), record_data.get(
+                        'title', ''), record_data.get('college', ''), record_data.get('department', ''), record_data.get(
+                            'phone', ''), record_data.get('email', ''), record_data.get('office_location', ''), record_data.get('introduction', ''), old_key))
+
+                cursor.execute("DELETE FROM TeacherResearchField WHERE teacher_id=%s", (new_key, ))
+                research_fields = record_data.get('research_field', '').split('、')
+                for rf in research_fields:
+                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field=%s", (rf.strip(), ))
+                    row = cursor.fetchone()
+                    if row:
+                        cursor.execute("INSERT INTO TeacherResearchField (teacher_id, field_id) VALUES (%s, %s)", (new_key, row['id']))
+                response_data['record'] = {'teacher_id': new_key}
 
             elif table == 'Project':
-                # 项目数据更新逻辑
-                new_key1 = record_data.get('project_name')
-                new_key2 = record_data.get('industry_chain')
-
-                # 检查重复项（排除自身）
-                if new_key1 != old_key1 or new_key2 != old_key2:
-                    cursor.execute(
-                        "SELECT * FROM Project WHERE project_name=%s AND industry_chain=%s",
-                        (new_key1, new_key2)
-                    )
+                new_key = record_data.get('project_id')
+                if new_key != old_key:
+                    cursor.execute("SELECT 1 FROM Project WHERE project_id=%s", (new_key, ))
                     if cursor.fetchone():
-                        return api_response(False, '项目已存在', {'type': 'duplicate'}, 409)
+                        return api_response(False, '项目编号已存在', {'type': 'duplicate'}, 409)
 
-                # 更新项目数据
-                cursor.execute(
-                    "UPDATE Project SET project_name=%s, industry_chain=%s, project_status=%s, project_content=%s, investor=%s, investment_amount=%s, financing_amount=%s, equity_financing=%s, debt_financing=%s, project_progress=%s, location=%s, contact_person=%s, contact_phone=%s WHERE project_name=%s AND industry_chain=%s",
-                    (new_key1, new_key2, record_data['project_status'], record_data['project_content'], record_data.get('investor', ''),
-                     record_data.get('investment_amount', 0), record_data.get(
-                         'financing_amount', 0), record_data.get('equity_financing', 0),
-                     record_data.get('debt_financing', 0), record_data.get(
-                         'project_progress', ''), record_data.get('location', ''),
-                     record_data.get('contact_person', ''), record_data.get('contact_phone', ''), old_key1, old_key2)
-                )
-                response_data['record'] = {'project_name': new_key1}
+                # 权限校验：审批通过和验收通过状态下，仅Admin可编辑
+                cursor.execute("SELECT project_approval_status, project_acceptance_status FROM Project WHERE project_id=%s", (old_key, ))
+                row = cursor.fetchone()
+                if not row:
+                    return api_response(False, '项目不存在', status=400)
 
-            elif table == 'Fund':
-                # 基金数据更新逻辑
-                new_key1 = record_data.get('fund_name')
-                new_key2 = record_data.get('investment_area')
+                approval_status = row['project_approval_status']
+                acceptance_status = row['project_acceptance_status']
 
-                # 检查重复项（排除自身）
-                if new_key1 != old_key1 or new_key2 != old_key2:
-                    cursor.execute(
-                        "SELECT * FROM Fund WHERE fund_name=%s AND investment_area=%s",
-                        (new_key1, new_key2)
-                    )
-                    if cursor.fetchone():
-                        return api_response(False, '基金已存在', {'type': 'duplicate'}, 409)
+                if (approval_status == '审批通过' or acceptance_status == '验收通过') and role != 'Admin':
+                    return api_response(False, '项目已审批或验收，仅管理员可编辑', status=403)
 
-                # 更新基金数据
-                cursor.execute(
-                    "UPDATE Fund SET fund_name=%s, investment_area=%s, management_agency=%s, contact_person=%s, phone=%s, fundraising_amount=%s, total_investment=%s WHERE fund_name=%s AND investment_area=%s",
-                    (new_key1, new_key2, record_data['management_agency'], record_data['contact_person'], record_data['phone'],
-                     record_data.get('fundraising_amount', 0), record_data.get('total_investment', 0), old_key1, old_key2)
-                )
-                response_data['record'] = {'fund_name': new_key1}
+                # 权限校验：学生必须是该项目的负责人；教师必须是该项目的指导老师
+                if role == 'Student':
+                    cursor.execute("SELECT 1 FROM StudentProject WHERE project_id=%s AND student_id=%s AND role='负责人'", (old_key, user_id))
+                    if not cursor.fetchone():
+                        return api_response(False, '您无权编辑该项目（不是负责人）', status=403)
+                elif role == 'Teacher':
+                    cursor.execute("SELECT 1 FROM TeacherProject WHERE project_id=%s AND teacher_id=%s", (old_key, user_id))
+                    if not cursor.fetchone():
+                        return api_response(False, '您无权编辑该项目（不是指导教师）', status=403)
+
+                # 更新项目主表
+                cursor.execute("UPDATE Project SET project_id=%s, name=%s, project_content=%s WHERE project_id=%s",
+                               (new_key, record_data.get('name', ''), record_data.get('project_content', ''), old_key))
+
+                # 更新研究领域
+                cursor.execute("DELETE FROM ProjectResearchField WHERE project_id=%s", (new_key, ))
+                research_fields = record_data.get('research_field', '').split('、')
+                for rf in research_fields:
+                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field=%s", (rf.strip(), ))
+                    row = cursor.fetchone()
+                    if row:
+                        cursor.execute("INSERT INTO ProjectResearchField (project_id, field_id) VALUES (%s, %s)", (new_key, row['id']))
+
+                # 更新人员关系
+                cursor.execute("DELETE FROM StudentProject WHERE project_id=%s", (new_key, ))
+                cursor.execute("DELETE FROM TeacherProject WHERE project_id=%s", (new_key, ))
+
+                leader_id = record_data.get('负责人学号', '').strip()
+                if leader_id:
+                    cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (leader_id, new_key))
+
+                member_ids = record_data.get('成员学号', '').split('、')
+                for mid in member_ids:
+                    mid = mid.strip()
+                    if mid:
+                        cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (mid, new_key))
+
+                teacher_ids = record_data.get('指导教师工号', '').split('、')
+                for tid in teacher_ids:
+                    tid = tid.strip()
+                    if tid:
+                        cursor.execute("INSERT INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (tid, new_key))
+
+                response_data['record'] = {'project_id': new_key}
 
             else:
                 return api_response(False, '不支持的表名', status=400)
@@ -318,7 +410,7 @@ class EditData(Resource):
 
         except Exception as e:
             connection.rollback()
-            return api_response(False, f'数据库错误: {str(e)}', status=500)
+            return api_response(False, f'服务器错误：{str(e)}', status=500)
         finally:
             cursor.close()
             connection.close()
@@ -326,49 +418,85 @@ class EditData(Resource):
 
 @ns.route('/delete')
 class DeleteData(Resource):
+
     @ns.expect(delete_parser)
     @ns.response(200, '删除成功')
     @ns.response(400, '请求数据格式错误')
+    @ns.response(403, '权限不足')
     @ns.response(500, '删除失败')
+    @auth_required(roles=['Admin', 'Teacher', 'Student'])
     def post(self):
         """删除数据"""
+        from flask_jwt_extended import get_jwt_identity, get_jwt
+        user_id = get_jwt_identity()
+        role = get_jwt().get('role')
+
         args = delete_parser.parse_args()
         table = args['table']
-        key1 = args['key1']
-        key2 = args['key2']
+        key = args['key']
 
-        if not all([table, key1, key2]):
+        if not all([table, key]):
             return api_response(False, '缺少必要参数', status=400)
 
         connection = get_db_connection()
         cursor = connection.cursor()
 
         try:
-            if table == 'Expert':
-                cursor.execute(
-                    "DELETE FROM Expert WHERE expert_name=%s AND specific_industry=%s",
-                    (key1, get_industry_id(key2)))
-            elif table == 'Project':
-                cursor.execute(
-                    "DELETE FROM Project WHERE project_name=%s AND industry_chain=%s",
-                    (key1, get_industry_id(key2)))
-            elif table == 'Fund':
-                cursor.execute(
-                    "DELETE FROM Fund WHERE fund_name=%s AND investment_area=%s",
-                    (key1, get_industry_id(key2)))
+            if table == 'Project':
+                # 查询审批状态
+                cursor.execute("SELECT project_approval_status, project_acceptance_status FROM Project WHERE project_id=%s", (key, ))
+                row = cursor.fetchone()
+                if not row:
+                    return api_response(False, '项目不存在', status=400)
+
+                approval_status = row['project_approval_status']
+                acceptance_status = row['project_acceptance_status']
+
+                # 已审批/验收项目只能由 Admin 删除
+                if (approval_status == '审批通过' or acceptance_status == '验收通过') and role != 'Admin':
+                    return api_response(False, '项目已审批或验收，仅管理员可删除', status=403)
+
+                # 权限校验
+                if role == 'Student':
+                    cursor.execute("SELECT 1 FROM StudentProject WHERE project_id=%s AND student_id=%s AND role='负责人'", (key, user_id))
+                    if not cursor.fetchone():
+                        return api_response(False, '无权删除该项目（不是负责人）', status=403)
+                elif role == 'Teacher':
+                    cursor.execute("SELECT 1 FROM TeacherProject WHERE project_id=%s AND teacher_id=%s", (key, user_id))
+                    if not cursor.fetchone():
+                        return api_response(False, '无权删除该项目（不是指导老师）', status=403)
+
+                # 删除项目及其关联信息
+                cursor.execute("DELETE FROM Project WHERE project_id=%s", (key, ))
+                cursor.execute("DELETE FROM ProjectResearchField WHERE project_id=%s", (key, ))
+                cursor.execute("DELETE FROM TeacherProject WHERE project_id=%s", (key, ))
+                cursor.execute("DELETE FROM StudentProject WHERE project_id=%s", (key, ))
+
+            elif table == 'Student':
+                if role != 'Admin':
+                    return api_response(False, '仅管理员可删除学生信息', status=403)
+
+                cursor.execute("DELETE FROM Student WHERE student_id=%s", (key, ))
+                cursor.execute("DELETE FROM StudentResearchField WHERE student_id=%s", (key, ))
+                cursor.execute("DELETE FROM StudentProject WHERE student_id=%s", (key, ))
+
+            elif table == 'Teacher':
+                if role != 'Admin':
+                    return api_response(False, '仅管理员可删除教师信息', status=403)
+
+                cursor.execute("DELETE FROM Teacher WHERE teacher_id=%s", (key, ))
+                cursor.execute("DELETE FROM TeacherResearchField WHERE teacher_id=%s", (key, ))
+                cursor.execute("DELETE FROM TeacherProject WHERE teacher_id=%s", (key, ))
+
             else:
                 return api_response(False, '不支持的表名', status=400)
 
             connection.commit()
-            return api_response(True, '删除成功', {'table': table, 'deleted_key': [key1, key2]})
+            return api_response(True, '删除成功', {'table': table, 'deleted_key': key})
 
         except Exception as e:
             connection.rollback()
-            return api_response(False, f'删除失败: {str(e)}', status=500)
+            return api_response(False, f'删除失败：{str(e)}', status=500)
         finally:
             cursor.close()
             connection.close()
-
-
-# 将命名空间添加到API
-# api.add_namespace(ns)

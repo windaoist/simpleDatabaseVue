@@ -1,38 +1,37 @@
 from flask import Blueprint, request
 from flask_restx import Api, Namespace, Resource, fields, reqparse
 from werkzeug.datastructures import FileStorage
-from app.utils import COLUMN_MAPPING, get_industry_id
+from app.utils import COLUMN_MAPPING, auth_required
 from app.database import get_db_connection
 import pandas as pd
 
 # 创建蓝图和API实例
 upload_bp = Blueprint('upload', __name__)
-api = Api(upload_bp, version='1.0',
-          title='Upload API', description='文件上传相关API')
+api = Api(upload_bp, version='1.0', title='Upload API', description='文件上传相关API')
 
 # 创建命名空间
 ns = Namespace('upload', description='文件上传操作')
 api.add_namespace(ns)
 
 # 定义响应模型
-upload_response = ns.model('UploadResponse', {
-    'code': fields.Integer(description='状态码'),
-    'message': fields.String(description='消息内容'),
-    'duplicates': fields.List(fields.String, description='重复数据列表', default=[])
-})
+upload_response = ns.model(
+    'UploadResponse', {
+        'code': fields.Integer(description='状态码'),
+        'message': fields.String(description='消息内容'),
+        'duplicates': fields.List(fields.String, description='重复数据列表', default=[])
+    })
 
 # 文件上传解析器
 upload_parser = reqparse.RequestParser()
-upload_parser.add_argument('file', location='files',
-                           type=FileStorage, required=True, help='Excel文件')
-
-# 文件上传逻辑
+upload_parser.add_argument('file', location='files', type=FileStorage, required=True, help='Excel文件')
 
 
 @ns.route('/')
 class UploadResource(Resource):
+
     @ns.expect(upload_parser)
     @ns.marshal_with(upload_response)
+    @auth_required(roles=['Admin'])
     def post(self):
         args = upload_parser.parse_args()
         file = args['file']
@@ -41,189 +40,229 @@ class UploadResource(Resource):
             return {'code': 400, 'message': '文件格式不正确，请上传 Excel 文件 (.xlsx)'}
 
         try:
-            if '专家库' in file.filename:
-                result = import_expert_data(file)
-            elif '项目库' in file.filename:
+            if '学生库' in file.filename:
+                result = import_student_data(file)
+            elif '教职工库' in file.filename:
+                result = import_teacher_data(file)
+            elif '科研项目库' in file.filename:
                 result = import_project_data(file)
-            elif '基金库' in file.filename:
-                result = import_fund_data(file)
             else:
                 return {'code': 400, 'message': '未知文件类型'}
 
-            return {
-                'code': 200,
-                'message': result['message'],
-                'duplicates': result.get('duplicates', [])
-            }
+            return {'code': 200, 'message': result['message'], 'duplicates': result.get('duplicates', [])}
         except Exception as e:
             return {'code': 500, 'message': f'上传过程中发生错误: {str(e)}'}
 
 
-# 导入专家数据
-def import_expert_data(file):
+# 导入学生表
+def import_student_data(file):
     df = pd.read_excel(file, header=0, engine='openpyxl')
-    df.columns = ['序号', '专家', '具体产业', '产业类别', '基金名称', '机构名称']
+    df.columns = ['序号', '学生学号', '姓名', '性别', '年级', '专业', '班级', '研究方向', '联系电话', '电子邮箱']
     df = df.rename(columns={v: k for k, v in COLUMN_MAPPING.items()})
     df = df.fillna('')
 
     connection = get_db_connection()
     cursor = connection.cursor()
-    cursor.execute("TRUNCATE TABLE Expert")
+
+    # 清空旧数据
+    cursor.execute("TRUNCATE TABLE Student")
+    cursor.execute("TRUNCATE TABLE StudentProject")
+    cursor.execute("TRUNCATE TABLE StudentResearchField")
 
     duplicates = set()
     inserted_count = 0
 
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         try:
-            specific_industry_id = get_industry_id(
-                row['specific_industry']) if row['specific_industry'] else None
-            params = (row['expert_name'], specific_industry_id)
+            student_id = row['student_id']
 
-            cursor.execute(
-                "SELECT * FROM Expert WHERE expert_name=%s AND specific_industry=%s", params)
+            cursor.execute("SELECT * FROM Student WHERE student_id=%s", (student_id, ))
             if cursor.fetchone():
-                duplicates.add(
-                    f"专家: {row['expert_name']}, 具体产业: {row['specific_industry']}")
+                duplicates.add(f"重复学生学号: {student_id}")
                 continue
 
-            cursor.execute(
-                "INSERT INTO Expert (expert_name, specific_industry, industry_category, fund_name, agency_name) VALUES (%s, %s, %s, %s, %s)",
-                (row['expert_name'], specific_industry_id, row['industry_category'],
-                 row['fund_name'], row['agency_name'])
-            )
+            cursor.execute("INSERT INTO Student (student_id, name, gender, grade, major, class, phone, email) "
+                           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                           (student_id, row['name'], row['gender'], row['grade'], row['major'], row['class'], row['phone'], row['email']))
             inserted_count += 1
-        except Exception:
+
+            # 处理研究方向（多对多插入）
+            field_names = row['research_field'].split('、') if row['research_field'] else []
+            for fname in field_names:
+                fname = fname.strip()
+                if not fname:
+                    continue
+                # 查询 ID
+                cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                res = cursor.fetchone()
+                if not res:
+                    duplicates.add(f"无效研究领域: {fname}（学生 {student_id}）")
+                    continue
+                field_id = res['id']
+                # 插入中间表
+                cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, field_id) VALUES (%s, %s)", (student_id, field_id))
+
+        except Exception as e:
+            duplicates.add(f"插入失败: {student_id}，错误: {str(e)}")
             continue
 
     connection.commit()
     cursor.close()
     connection.close()
 
-    message = f'成功导入 {inserted_count} 条专家数据'
+    message = f'成功导入 {inserted_count} 条学生数据'
     if duplicates:
-        message += f', 跳过 {len(duplicates)} 条重复数据'
+        message += f', 跳过 {len(duplicates)} 条重复或异常数据'
 
-    return {
-        'message': message,
-        'duplicates': list(duplicates)
-    }
+    return {'message': message, 'duplicates': list(duplicates)}
 
 
-# 导入项目数据
+# 导入教职工表
+def import_teacher_data(file):
+    df = pd.read_excel(file, header=0, engine='openpyxl')
+    df.columns = ['序号', '教职工号', '姓名', '性别', '职称', '所属学院', '所属专业', '研究领域', '联系电话', '电子邮箱', '办公地点', '个人简介']
+    df = df.rename(columns={v: k for k, v in COLUMN_MAPPING.items()})
+    df = df.fillna('')
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    # 清空旧数据
+    cursor.execute("TRUNCATE TABLE Teacher")
+    cursor.execute("TRUNCATE TABLE TeacherProject")
+    cursor.execute("TRUNCATE TABLE TeacherResearchField")
+
+    duplicates = set()
+    inserted_count = 0
+
+    for _, row in df.iterrows():
+        try:
+            teacher_id = row['teacher_id']
+
+            cursor.execute("SELECT * FROM Teacher WHERE teacher_id=%s", (teacher_id, ))
+            if cursor.fetchone():
+                duplicates.add(f"重复教职工号: {teacher_id}")
+                continue
+
+            cursor.execute(
+                "INSERT INTO Teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (teacher_id, row['name'], row['gender'], row['title'], row['college'], row['department'],
+                                                                        row['phone'], row['email'], row['office_location'], row['introduction']))
+            inserted_count += 1
+
+            # 处理研究方向（多对多插入）
+            field_names = row['research_field'].split('、') if row['research_field'] else []
+            for fname in field_names:
+                fname = fname.strip()
+                if not fname:
+                    continue
+                # 查询 ID
+                cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                res = cursor.fetchone()
+                if not res:
+                    duplicates.add(f"无效研究领域: {fname}（教师 {teacher_id}）")
+                    continue
+                field_id = res['id']
+                # 插入中间表
+                cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, field_id) VALUES (%s, %s)", (teacher_id, field_id))
+
+        except Exception as e:
+            duplicates.add(f"插入失败: {teacher_id}，错误: {str(e)}")
+            continue
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+    message = f"成功导入 {inserted_count} 条教职工数据"
+    if duplicates:
+        message += f"，跳过 {len(duplicates)} 条重复或异常数据"
+
+    return {'message': message, 'duplicates': list(duplicates)}
+
+
+# 导入科研项目表
 def import_project_data(file):
     df = pd.read_excel(file, header=0, engine='openpyxl')
-    df.columns = [
-        '序号', '项目名称', '所属产业链', '项目状态', '项目内容', '投资方', '投资额', '融资额', '股权融资',
-        '债权融资', '项目进展及资本对接情况', '落地区域', '联系人', '联系方式'
-    ]
+    df.columns = ['序号', '项目编号', '项目名称', '研究领域', '负责人学号', '成员学号', '指导教师工号', '项目内容']
     df = df.rename(columns={v: k for k, v in COLUMN_MAPPING.items()})
     df = df.fillna('')
 
     connection = get_db_connection()
     cursor = connection.cursor()
+
+    # 清空旧数据
     cursor.execute("TRUNCATE TABLE Project")
+    cursor.execute("TRUNCATE TABLE StudentProject")
+    cursor.execute("TRUNCATE TABLE TeacherProject")
+    cursor.execute("TRUNCATE TABLE ProjectResearchField")
 
     duplicates = set()
     inserted_count = 0
 
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         try:
-            industry_chain_id = get_industry_id(
-                row['industry_chain']) if row['industry_chain'] else None
-            params = (row['project_name'], industry_chain_id)
+            project_id = row['project_id']
 
-            cursor.execute(
-                "SELECT * FROM Project WHERE project_name=%s AND industry_chain=%s", params)
+            cursor.execute("SELECT * FROM Project WHERE project_id=%s", (project_id, ))
             if cursor.fetchone():
-                duplicates.add(
-                    f"项目名称: {row['project_name']}, 所属产业链: {row['industry_chain']}")
+                duplicates.add(f"重复项目编号: {project_id}")
                 continue
 
             cursor.execute(
-                "INSERT INTO Project (project_name, industry_chain, project_status, project_content, investor, investment_amount, financing_amount, equity_financing, debt_financing, project_progress, location, contact_person, contact_phone) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                (row['project_name'], industry_chain_id, row['project_status'], row['project_content'],
-                 row['investor'], row['investment_amount'], row['financing_amount'], row['equity_financing'],
-                 row['debt_financing'], row['project_progress'], row['location'], row['contact_person'],
-                 row['contact_phone'])
-            )
+                "INSERT INTO Project (project_id, name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
+                "VALUES (%s, %s, %s, %s, %s, %s)", (project_id, row['name'], row['project_content'], row['project_application_status'],
+                                                    row['project_approval_status'], row['project_acceptance_status']))
             inserted_count += 1
-        except Exception:
-            continue
 
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-    message = f'成功导入 {inserted_count} 条项目数据'
-    if duplicates:
-        message += f', 跳过 {len(duplicates)} 条重复数据'
-
-    return {
-        'message': message,
-        'duplicates': list(duplicates)
-    }
-
-
-# 导入基金数据
-def import_fund_data(file):
-    df = pd.read_excel(file, header=0, engine='openpyxl')
-    df.columns = ['序号', '基金名称', '投资领域', '管理机构', '联系人', '电话', '募资规模', '投资总金额']
-    df = df.rename(columns={v: k for k, v in COLUMN_MAPPING.items()})
-    df = df.fillna('')
-
-    # 处理数字字段
-    df['fundraising_amount'] = pd.to_numeric(
-        df['fundraising_amount'], errors='coerce').fillna(0)
-    df['total_investment'] = pd.to_numeric(
-        df['total_investment'], errors='coerce').fillna(0)
-
-    connection = get_db_connection()
-    cursor = connection.cursor()
-    cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-    cursor.execute("TRUNCATE TABLE Fund")
-    cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-
-    duplicates = set()
-    inserted_count = 0
-
-    for index, row in df.iterrows():
-        try:
-            investment_areas = row['investment_area'].split(
-                '、') if row['investment_area'] else []
-
-            for area in investment_areas:
-                area = area.strip()
-                if not area:
+            # 处理研究方向（多对多插入）
+            field_names = row['research_field'].split('、') if row['research_field'] else []
+            for fname in field_names:
+                fname = fname.strip()
+                if not fname:
                     continue
+                # 查询 ID
+                cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                res = cursor.fetchone()
+                if not res:
+                    duplicates.add(f"无效研究领域: {fname}（项目 {project_id}）")
+                    continue
+                field_id = res['id']
+                # 插入中间表
+                cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, field_id) VALUES (%s, %s)", (project_id, field_id))
 
-                investment_area_id = get_industry_id(area)
-                params = (row['fund_name'], investment_area_id)
-
-                cursor.execute(
-                    "SELECT * FROM Fund WHERE fund_name=%s AND investment_area=%s", params)
+            # 插入负责人（学生，最多1个）
+            leader_ids = [s.strip() for s in row.get('负责人学号', '').split('、') if s.strip()]
+            if leader_ids:
+                student_id = leader_ids[0]  # 只取第一个
+                cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (student_id, ))
                 if cursor.fetchone():
-                    duplicates.add(f"基金名称: {row['fund_name']}, 投资领域: {area}")
-                    continue
+                    cursor.execute("INSERT IGNORE INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (student_id, project_id))
 
-                cursor.execute(
-                    "INSERT INTO Fund (fund_name, investment_area, management_agency, contact_person, phone, fundraising_amount, total_investment) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                    (row['fund_name'], investment_area_id, row['management_agency'],
-                     row['contact_person'], row['phone'], row['fundraising_amount'],
-                     row['total_investment'])
-                )
-                inserted_count += 1
-        except Exception:
+            # 插入成员（学生，最多4个）
+            member_ids = [s.strip() for s in row.get('成员学号', '').split('、') if s.strip()]
+            for student_id in member_ids[:4]:  # 最多取前4个
+                cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (student_id, ))
+                if cursor.fetchone():
+                    cursor.execute("INSERT IGNORE INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (student_id, project_id))
+
+            # 插入指导教师（最多2个）
+            teacher_ids = [t.strip() for t in row.get('指导教师工号', '').split('、') if t.strip()]
+            for teacher_id in teacher_ids[:2]:  # 最多取前2个
+                cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id = %s", (teacher_id, ))
+                if cursor.fetchone():
+                    cursor.execute("INSERT IGNORE INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (teacher_id, project_id))
+
+        except Exception as e:
+            duplicates.add(f"插入失败: {project_id}，错误: {str(e)}")
             continue
 
     connection.commit()
     cursor.close()
     connection.close()
 
-    message = f'成功导入 {inserted_count} 条基金数据'
+    message = f'成功导入 {inserted_count} 条科研项目数据'
     if duplicates:
-        message += f', 跳过 {len(duplicates)} 条重复数据'
+        message += f', 跳过 {len(duplicates)} 条重复或异常数据'
 
-    return {
-        'message': message,
-        'duplicates': list(duplicates)
-    }
+    return {'message': message, 'duplicates': list(duplicates)}
