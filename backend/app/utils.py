@@ -38,6 +38,7 @@ def api_response(success, message, data=None, status=200):
     """统一API响应格式"""
     return {'success': success, 'message': message, 'data': data}, status
 
+
 # # 获取ID
 # def get_field_id(research_field):
 #     connection = get_db_connection()
@@ -65,37 +66,43 @@ def get_fields():
 
 def get_related_data_api(cursor, table, field_ids):
     """
-    使用视图查询研究领域匹配数据（排除自身）
+    查询与当前研究领域完全匹配的相关学生、教师、项目（排除自身表）
     """
-    related_data = {
-        'related_students': [],
-        'related_teachers': [],
-        'related_projects': []
+    related_data = {'related_students': [], 'related_teachers': [], 'related_projects': []}
+
+    relation_map = {
+        'Student': ('StudentResearchField', 'student_id', 'view_student', 'related_students'),
+        'Teacher': ('TeacherResearchField', 'teacher_id', 'view_teacher', 'related_teachers'),
+        'Project': ('ProjectResearchField', 'project_id', 'view_project', 'related_projects'),
     }
 
-    view_map = {
-        'Student': 'view_student',
-        'Teacher': 'view_teacher',
-        'Project': 'view_project'
-    }
-
-    for related_table in ['Student', 'Teacher', 'Project']:
+    for related_table, (middle_table, id_field, view_name, target_key) in relation_map.items():
         if related_table == table:
-            continue  # 跳过主表
-
-        view_name = view_map[related_table]
+            continue  # 排除当前表自身
 
         try:
-            # 使用 REGEXP 匹配研究领域
-            pattern = '|'.join([str(fid) for fid in field_ids])
-            sql = f"SELECT * FROM {view_name} WHERE research_field REGEXP %s"
-            cursor.execute(sql, (pattern,))
+            # 构造 SQL：查找完全包含所有研究领域的ID列表
+            cursor.execute(
+                f"""
+                SELECT {id_field}
+                FROM {middle_table}
+                WHERE research_field IN ({','.join(['%s'] * len(field_ids))})
+                GROUP BY {id_field}
+                HAVING COUNT(DISTINCT research_field) = %s
+                """, field_ids + [len(field_ids)])
+            matched_ids = [str(row[id_field]) for row in cursor.fetchall()]
+            if not matched_ids:
+                continue
+
+            placeholders = ','.join(['%s'] * len(matched_ids))
+            sql = f"SELECT * FROM {view_name} WHERE {id_field} IN ({placeholders})"
+            cursor.execute(sql, matched_ids)
             rows = cursor.fetchall()
 
             for idx, row in enumerate(rows, 1):
                 row = dict(row)
                 row['序号'] = idx
-                related_data[f'related_{related_table.lower()}s'].append(row)
+                related_data[target_key].append(row)
 
         except Exception as e:
             print(f"[相关数据查询失败] {related_table}: {e}")
