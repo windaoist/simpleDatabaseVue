@@ -5,10 +5,13 @@ import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const queryForm = ref({
-  keyword1: '',
-  keyword2: '',
-  table: '',
+  table: 'Expert',
+  filters: {},
+  research_field: [],
 })
+const fields = ref([])
+const secondFieldKey = ref('')
+const formData = ref({})
 const industries = ref()
 const currentForm = ref()
 // const editingState = reactive({});
@@ -26,7 +29,28 @@ const responseData = ref({
 const activeName = ref()
 // 新增：用于存储原始列顺序
 const columnOrder = ref([])
-
+async function onTableChange() {
+  try {
+    const response = await request.get('query/', {
+      params: {
+        table: queryForm.value.table,
+      },
+    })
+    if (response.data.success) {
+      fields.value = Object.keys(response.data.data.results[0]).filter((key) => key !== '序号')
+      // 记录第二个字段 key
+      if (fields.value.length >= 2) {
+        secondFieldKey.value = fields.value[1]
+      }
+      fields.value.forEach((key) => {
+        formData[key] = ''
+      })
+      console.log('获取表格式成功', fields.value)
+    }
+  } catch (error) {
+    ElMessage.error('获取表格式失败，' + error.message)
+  }
+}
 const onQuerySubmit = async () => {
   try {
     if (!queryForm.value.table) {
@@ -35,9 +59,9 @@ const onQuerySubmit = async () => {
     }
     const response = await request.get('query/', {
       params: {
-        keyword1: queryForm.value.keyword1,
-        keyword2: queryForm.value.keyword2,
-        table: queryForm.value.table,
+        table: '',
+        filters: {},
+        research_field: [],
       },
     })
     responseData.value = response.data
@@ -160,8 +184,8 @@ async function onDownload() {
   try {
     const response = await request.get('export/excel', {
       params: {
-        keyword1: queryForm.value.keyword1,
-        keyword2: queryForm.value.keyword2,
+        // keyword1: queryForm.value.keyword1,
+        // keyword2: queryForm.value.keyword2,
         table: queryForm.value.table,
       },
     })
@@ -199,9 +223,9 @@ function handleDialogClose() {
   contentDialogVisible.value = false
 }
 
-async function fetchIndustries() {
+async function fetchFields() {
   try {
-    const response = await request.get('add-edit/industries')
+    const response = await request.get('query/research_fields')
     industries.value = response.data.data.industries
     console.log('行业列表:', industries.value)
   } catch (error) {
@@ -210,7 +234,7 @@ async function fetchIndustries() {
 }
 onMounted(() => {
   // 初始化行业列表
-  fetchIndustries()
+  // fetchIndustries()
 })
 // 行样式（编辑状态背景色）
 // const getRowClassName = ({ row }) => {
@@ -222,32 +246,19 @@ onMounted(() => {
     <div class="query-view">
       <el-form :inline="true" :model="queryForm">
         <div class="query-form-items">
-          <el-form-item label="关键字1">
-            <el-input v-model="queryForm.keyword1" placeholder="主要关键字"></el-input>
-          </el-form-item>
-          <el-form-item label="关键字2">
-            <!-- <el-input v-model="queryForm.keyword2" placeholder="次要关键字"></el-input> -->
+          <el-form-item label="查询表名">
             <el-select
-              v-model="queryForm.keyword2"
-              clearable
-              placeholder="次要关键字"
+              v-model="queryForm.table"
+              @change="onTableChange()"
+              placeholder="请选择查询表名"
               style="width: 220px"
             >
-              <el-option
-                v-for="industry in industries"
-                :key="industry.id"
-                :label="industry.industry_name"
-                :value="industry.industry_name"
-              ></el-option>
-            </el-select>
-          </el-form-item>
-          <el-form-item label="查询表名">
-            <el-select v-model="queryForm.table" placeholder="请选择查询表名" style="width: 220px">
               <el-option label="专家表" value="Expert"></el-option>
               <el-option label="项目表" value="Project"></el-option>
               <el-option label="基金表" value="Fund"></el-option>
             </el-select>
           </el-form-item>
+
           <el-form-item>
             <el-button type="primary" @click="onQuerySubmit" class="submit-btn">查询</el-button>
             <el-button

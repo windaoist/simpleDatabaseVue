@@ -4,6 +4,7 @@ from app.utils import COLUMN_MAPPING, get_related_data_api, auth_required, api_r
 from app.database import get_db_connection
 import traceback
 import decimal
+from app.utils import get_fields
 
 query_bp = Blueprint('query_bp', __name__)
 query_ns = Namespace('query', description='数据查询接口')
@@ -49,6 +50,19 @@ def convert_decimal(obj):
         return float(obj)
     else:
         return obj
+
+
+@query_ns.route('/research_fields')
+class FieldData(Resource):
+    @query_ns.response(200, '研究领域数据获取成功')
+    @query_ns.response(500, '获取研究领域数据失败')
+    def get(self):
+        """获取所有研究领域数据"""
+        try:
+            research_fields = get_fields()
+            return api_response(True, '研究领域数据获取成功', {'research_fields': research_fields})
+        except Exception as e:
+            return api_response(False, f'获取研究领域数据失败: {str(e)}', status=500)
 
 
 @query_ns.route('/')

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
-import * as translate from '@/stores/LanguageConverter.ts'
+import * as translate from '@/stores/LanguageConverter'
 import { ElMessage } from 'element-plus'
 const currentTable = ref('Expert')
 const fields = ref([])
