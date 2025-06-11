@@ -257,8 +257,8 @@ def import_project_data(file):
 
                 # 提取所有人编号
                 leader_ids = extract_ids(row.get('leader', '').split('、'))
-                member_ids = extract_ids(row.get('members', '').split('、'))
-                teacher_ids = extract_ids(row.get('teachers', '').split('、'))
+                member_ids = extract_ids(row.get('member', '').split('、'))
+                teacher_ids = extract_ids(row.get('teacher', '').split('、'))
 
                 # 检查配额限制
                 if leader_ids:

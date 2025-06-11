@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS Student (
 -- 科研项目表
 CREATE TABLE IF NOT EXISTS Project (
     project_id VARCHAR(50) PRIMARY KEY COMMENT '项目编号',
-    name VARCHAR(255) NOT NULL COMMENT '项目名称',
+    project_name VARCHAR(255) NOT NULL COMMENT '项目名称',
     project_content TEXT COMMENT '项目内容',
     project_application_status VARCHAR(20) DEFAULT '未申报',
     project_approval_status VARCHAR(20) DEFAULT '未审批',
