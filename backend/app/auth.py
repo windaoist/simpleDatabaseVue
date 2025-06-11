@@ -58,7 +58,7 @@ class Login(Resource):
             # 教职工
             if role == 'Teacher':
                 cursor.execute(
-                    "SELECT * FROM Expert WHERE teacher_id = %s", (username, ))
+                    "SELECT * FROM teacher WHERE teacher_id = %s", (username, ))
                 user = cursor.fetchone()
                 if not user:
                     return api_response(False, '教职工账号不存在', status=404)
@@ -68,7 +68,7 @@ class Login(Resource):
             # 学生
             elif role == 'Student':
                 cursor.execute(
-                    "SELECT * FROM Fund WHERE student_id = %s", (username, ))
+                    "SELECT * FROM student WHERE student_id = %s", (username, ))
                 user = cursor.fetchone()
                 if not user:
                     return api_response(False, '学生账号不存在', status=404)
