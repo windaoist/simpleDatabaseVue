@@ -6,13 +6,14 @@ import { ElMessage } from 'element-plus'
 import { getAttribute } from '@/stores/TableStructure'
 const currentTable = ref('student')
 const fields = ref([])
+const primaryKey = ref()
 const formData = ref({
   table: '',
   filters: {},
   research_field: [],
 })
 const research_fields = ref([])
-const secondFieldKey = ref('')
+// const secondFieldKey = ref('')
 async function onQuery() {
   try {
     if (!currentTable.value) {
@@ -22,31 +23,22 @@ async function onQuery() {
     // 获取表结构
     const attributes = await getAttribute(currentTable.value)
     fields.value = attributes
-    secondFieldKey.value = attributes[1] || ''
+    primaryKey.value = fields.value[0]
+    // secondFieldKey.value = attributes[1] || ''
     console.log('表结构:', fields.value)
   } catch (error) {
     ElMessage.error('获取表格式失败，' + error.message)
   }
 }
 async function handleSubmit() {
-  const processedData = { ...formData.value }
-  // 处理第二个字段：如果匹配 industries，替换为 id
-  const secondFieldValue = formData.value[secondFieldKey.value]
-  const matchedIndustry = research_fields.value.find(
-    (industry) => industry.industry_name === secondFieldValue,
-  )
-
-  if (matchedIndustry) {
-    processedData[secondFieldKey.value] = matchedIndustry.id
-  }
   const payload = {
     table: currentTable.value,
-    data: {},
+    key: primaryKey.value,
+    data: {
+      ...formData.value.filters,
+    },
   }
-  Object.keys(processedData).forEach((key) => {
-    const newKey = translate.translateToEnglish(key)
-    payload.data[newKey] = processedData[key]
-  })
+
   console.log('提交数据:', payload)
   try {
     const response = await request.post('add-edit/add', payload, {

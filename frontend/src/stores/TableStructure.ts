@@ -23,7 +23,7 @@ const teacherAttribute: Array<string> = [
 ]
 const projectAttribute: Array<string> = [
   'project_id',
-  'name',
+  'project_name',
   'research_field',
   'project_content',
   'project_application_status',
