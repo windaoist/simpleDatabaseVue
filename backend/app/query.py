@@ -66,7 +66,7 @@ class QueryResource(Resource):
     @query_ns.response(500, '服务器错误', error_model)
     @auth_required(roles=['Admin', 'Teacher', 'Student'])
     def post(self):
-        """支持字段字典模糊查询 + 多研究领域筛选 + 权限控制 + 视图优化"""
+        """支持字段字典模糊查询 + 多研究领域筛选 + 权限控制"""
         data = request.get_json()
         if not data:
             return api_response(False, '请求体必须为JSON', status=400)
@@ -80,6 +80,10 @@ class QueryResource(Resource):
 
         if not table:
             return api_response(False, '缺少table参数', status=400)
+
+        # 限制学生只可访问 Project 表
+        if role == 'Student' and table.lower() != 'project':
+            return api_response(False, '学生无权限访问该表', status=403)
 
         view_table = f"view_{table.lower()}"
 
@@ -108,30 +112,43 @@ class QueryResource(Resource):
             wheres = []
             sql_params = []
 
-            # 模糊匹配字段
+            # 模糊字段匹配
             for field, keyword in keyword_dict.items():
                 if field in valid_fields:
                     wheres.append(f"{field} LIKE %s")
                     sql_params.append(f"%{keyword}%")
 
-            # 研究领域模糊匹配
+            # 研究领域 REGEXP
             if 'research_field' in valid_fields and research_field_ids:
                 pattern = '|'.join(map(str, research_field_ids))
                 wheres.append("research_field REGEXP %s")
                 sql_params.append(pattern)
 
-            # 权限控制（仅对 Project 表）
+            # 权限控制逻辑（仅Project表启用）
             if table.lower() == 'project':
                 if role == 'Student':
-                    # 匹配姓名(学号)
-                    wheres.append("(leader LIKE %s OR member LIKE %s)")
-                    like_pattern = f"%({username})%"
-                    sql_params += [like_pattern, like_pattern]
-                elif role == 'Teacher':
-                    wheres.append("teacher LIKE %s")
-                    sql_params.append(f"%({username})%")
+                    # 查找该学生参与的所有项目编号
+                    cursor.execute("SELECT project_id FROM StudentProject WHERE student_id = %s", (username, ))
+                    project_ids = [str(row['project_id']) for row in cursor.fetchall()]
+                    if not project_ids:
+                        return api_response(True, '暂无匹配数据', data={'results': [], 'query_params': data})
 
-            # 构造 SQL
+                    placeholders = ','.join(['%s'] * len(project_ids))
+                    wheres.append(f"project_id IN ({placeholders})")
+                    sql_params += project_ids
+
+                elif role == 'Teacher':
+                    # 查找该教师参与的所有项目编号
+                    cursor.execute("SELECT project_id FROM TeacherProject WHERE teacher_id = %s", (username, ))
+                    project_ids = [str(row['project_id']) for row in cursor.fetchall()]
+                    if not project_ids:
+                        return api_response(True, '暂无匹配数据', data={'results': [], 'query_params': data})
+
+                    placeholders = ','.join(['%s'] * len(project_ids))
+                    wheres.append(f"project_id IN ({placeholders})")
+                    sql_params += project_ids
+
+            # 构建最终SQL
             sql = f"SELECT * FROM {view_table}"
             if wheres:
                 sql += " WHERE " + " AND ".join(f"({w})" for w in wheres)

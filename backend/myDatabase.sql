@@ -167,30 +167,29 @@ CREATE OR REPLACE VIEW view_project AS
 SELECT
     p.project_id,
     p.project_name,
-    -- 拼接研究领域
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field,
-    -- 负责人
+    -- 负责人显示为 姓名(学号)
     (
-        SELECT GROUP_CONCAT(s.name SEPARATOR '、')
+        SELECT GROUP_CONCAT(CONCAT(s.name, '(', s.student_id, ')') SEPARATOR '、')
         FROM StudentProject sp
         JOIN Student s ON sp.student_id = s.student_id
         WHERE sp.project_id = p.project_id AND sp.role = '负责人'
     ) AS leader,
-    -- 成员
+    -- 成员显示为 姓名(学号)
     (
-        SELECT GROUP_CONCAT(s.name SEPARATOR '、')
+        SELECT GROUP_CONCAT(CONCAT(s.name, '(', s.student_id, ')') SEPARATOR '、')
         FROM StudentProject sp
         JOIN Student s ON sp.student_id = s.student_id
         WHERE sp.project_id = p.project_id AND sp.role = '成员'
     ) AS member,
-    -- 指导教师
+    -- 指导教师显示为 姓名(教职工号)
     (
-        SELECT GROUP_CONCAT(t.name SEPARATOR '、')
+        SELECT GROUP_CONCAT(CONCAT(t.name, '(', t.teacher_id, ')') SEPARATOR '、')
         FROM TeacherProject tp
         JOIN Teacher t ON tp.teacher_id = t.teacher_id
         WHERE tp.project_id = p.project_id
     ) AS teacher,
-    -- 项目状态字段
+    -- 状态字段
     p.project_application_status,
     p.project_approval_status,
     p.project_acceptance_status
