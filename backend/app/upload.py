@@ -167,7 +167,7 @@ def import_teacher_data(file):
 
                 cursor.execute(
                     "INSERT INTO Teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     (teacher_id, row['name'], row['gender'], row['title'], row['college'], row['department'], row['phone'], row['email'],
                      row['office_location'], row['introduction']))
                 inserted_count += 1
