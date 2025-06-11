@@ -8,32 +8,34 @@ const navItems = [
 </script>
 
 <template>
-  <ElRow :gutter="30" justify="center">
-    <ElCol
-      :xs="24"
-      :sm="12"
-      :md="12"
-      :lg="12"
-      v-for="item in navItems"
-      :key="item.path"
-      class="grid-item"
-    >
-      <ElCard class="operation-card" shadow="hover">
-        <div class="card-content">
-          <div class="card-icon">
-            <div class="icon-wrapper">
-              <span class="icon-text">{{ item.name.charAt(0) }}</span>
+  <div class="card-items">
+    <ElRow :gutter="30" justify="center">
+      <ElCol
+        :xs="24"
+        :sm="12"
+        :md="12"
+        :lg="12"
+        v-for="item in navItems"
+        :key="item.path"
+        class="grid-item"
+      >
+        <ElCard class="operation-card" shadow="hover">
+          <div class="card-content">
+            <div class="card-icon">
+              <div class="icon-wrapper">
+                <span class="icon-text">{{ item.name.charAt(0) }}</span>
+              </div>
             </div>
+            <h2>{{ item.name }}</h2>
+            <p class="card-desc">点击进入{{ item.name }}页面</p>
+            <RouterLink :to="item.path">
+              <ElButton type="primary" class="card-button" round>进入操作</ElButton>
+            </RouterLink>
           </div>
-          <h2>{{ item.name }}</h2>
-          <p class="card-desc">点击进入{{ item.name }}页面</p>
-          <RouterLink :to="item.path">
-            <ElButton type="primary" class="card-button" round>进入操作</ElButton>
-          </RouterLink>
-        </div>
-      </ElCard>
-    </ElCol>
-  </ElRow>
+        </ElCard>
+      </ElCol>
+    </ElRow>
+  </div>
 </template>
 
 <style scoped>
@@ -49,6 +51,7 @@ const navItems = [
     transform 0.3s,
     box-shadow 0.3s;
   height: 100%;
+  width: 100%;
 }
 
 .operation-card:hover {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
@@ -20,7 +20,7 @@ const account = ref({
   password: '',
   role: '',
 })
-const LoggedIn = ref(false)
+const LoggedIn = computed(() => !!localStorage.getItem('jwt_token'))
 async function handleLogin() {
   if (account.value.username === '' || account.value.password === '' || account.value.role === '') {
     ElMessage.error('用户名，密码或类别不能为空')
@@ -29,7 +29,7 @@ async function handleLogin() {
   try {
     const response = await request.post('/auth/login', account.value)
     localStorage.setItem('jwt_token', response.data.data.token)
-    LoggedIn.value = true
+    // LoggedIn.value = true
   } catch (error) {
     console.error('登录失败', error.message)
     ElMessage.error('登录失败：' + error.response?.data?.message || '请稍后再试')
@@ -43,7 +43,7 @@ async function handleLogout() {
   try {
     // await request.post('/auth/logout')
     localStorage.removeItem('jwt_token')
-    LoggedIn.value = false
+    // LoggedIn.value = false
     ElMessage.success('注销成功')
   } catch (error) {
     console.error('注销失败', error.message)
@@ -100,33 +100,28 @@ onMounted(() => {
         <el-button class="login-btn" type="primary" @click="handleLogin">登录</el-button>
       </div>
     </el-dialog>
-    <el-container>
-      <el-header>
-        <div class="header-content">
+    <el-container style="height: 100vh">
+      <el-aside width="200px">
+        <div class="sidebar-content">
           <div class="logo-container">
             <img alt="Vue logo" class="logo" src="@/assets/logo.svg" />
             <h1 class="app-title">数据库操作平台</h1>
           </div>
-          <el-button
-            type="primary"
-            v-if="!LoggedIn"
-            style="margin-left: 5%"
-            class="icon-wrapper"
-            @click="loginDialogVisible = true"
-          >
-            登录
-          </el-button>
-          <el-button
-            type="danger"
-            v-else
-            style="margin-left: 5%"
-            class="icon-wrapper"
-            @click="handleLogout"
-          >
-            注销
-          </el-button>
+          <div class="auth-button">
+            <el-button
+              type="primary"
+              v-if="!LoggedIn"
+              class="icon-wrapper"
+              @click="loginDialogVisible = true"
+            >
+              登录
+            </el-button>
+            <el-button type="danger" v-else class="icon-wrapper" @click="handleLogout">
+              注销
+            </el-button>
+          </div>
           <ElMenu
-            mode="horizontal"
+            mode="vertical"
             class="app-menu"
             :default-active="$route.path"
             background-color="#ffffff"
@@ -141,7 +136,7 @@ onMounted(() => {
             </ElMenuItem>
           </ElMenu>
         </div>
-      </el-header>
+      </el-aside>
 
       <el-main>
         <RouterView class="router-view" />
@@ -186,105 +181,130 @@ a {
 .common-layout {
   min-height: 100vh;
   display: flex;
+  height: fit-content;
   flex-direction: column;
   background-color: #f5f7fa;
   font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', Arial, sans-serif;
 }
 
-.el-header {
+.el-aside {
   background-color: #ffffff;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  position: sticky;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  width: 220px;
+  height: 100vh;
+  position: fixed;
+  left: 0;
   top: 0;
-  height: fit-content;
   z-index: 1000;
+  transition: all 0.3s ease;
 }
 
-.header-content {
-  max-width: 1200px;
-  margin: 0 auto;
+.sidebar-content {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 0;
+  flex-direction: column;
+  align-items: stretch;
+  height: 100%;
+  padding: 20px 15px;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .logo-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 15px;
-  /* flex-shrink: 0; 新增 */
+  gap: 10px;
+  margin-bottom: 30px;
 }
 
-.app-menu {
-  border-bottom: none;
-  flex: 1; /* 允许扩展 */
-  min-width: 0; /* 防止溢出 */
-  display: flex;
-  justify-content: flex-end; /* 右对齐 */
-}
-
-.app-menu > .el-menu {
-  width: 100%;
-  justify-content: flex-end;
-}
 .logo {
-  width: 50px;
-  height: 50px;
-  transition: transform 0.3s;
+  width: 60px;
+  height: 60px;
+  transition: transform 0.3s ease;
 }
 
 .logo:hover {
-  transform: rotate(15deg);
+  transform: rotate(10deg) scale(1.1);
 }
 
 .app-title {
-  font-size: 1.8rem;
+  font-size: 1.4rem;
   font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
+  color: #34495e;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.auth-button {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.icon-wrapper {
+  width: 80%;
+  font-size: 14px;
+}
+
+.app-menu {
+  flex-grow: 1;
+  width: 100%;
+  border-right: none;
 }
 
 .app-menu .el-menu-item {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 500;
-  margin: 0 5px;
-  border-radius: 4px;
-  transition: all 0.3s;
+  margin: 5px 8px;
+  border-radius: 6px;
+  transition: background-color 0.25s ease;
+  padding-left: 20px !important;
 }
-
+.el-menu-item a {
+  color: inherit;
+  text-decoration: none;
+}
 .app-menu .el-menu-item:hover {
-  background-color: #ecf5ff !important;
+  background-color: #f0f8ff !important;
 }
 
 .app-menu .el-menu-item.is-active {
   background-color: #ecf5ff !important;
-  border-bottom: 2px solid #409eff;
+  border-left: 4px solid #409eff;
+  font-weight: bold;
+  color: #409eff !important;
 }
 
 .el-main {
   overflow-y: auto;
   flex: 1;
   max-width: 2000px;
-  margin: 30px auto;
+  margin-top: 30px;
+  margin-left: 220px;
+  margin-bottom: 30px;
   padding: 0 20px;
 }
 
-.router-view {
+/* .router-view {
   max-width: 2000px;
   width: 100%;
   margin: 0 auto 30px;
   padding: 0 20px;
-}
+} */
 
 @media (max-width: 768px) {
   .common-layout {
     height: 100%;
   }
-  .header-content {
-    flex-direction: column;
-    gap: 15px;
-    position: sticky;
+
+  .el-aside {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+
+  .el-main {
+    margin-left: 0;
   }
 
   .app-title {
@@ -293,7 +313,6 @@ a {
 
   .app-menu {
     width: 100%;
-    justify-content: center;
   }
 
   .icon-wrapper {

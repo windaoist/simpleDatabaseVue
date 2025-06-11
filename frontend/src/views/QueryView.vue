@@ -12,7 +12,11 @@ const queryForm = ref({
 })
 const fields = ref([])
 const secondFieldKey = ref('')
-const formData = ref({})
+// const formData = ref({
+//   table: '',
+//   filters: {},
+//   research_field: [],
+// })
 const research_fields = ref()
 const currentForm = ref()
 // const editingState = reactive({});
@@ -51,10 +55,16 @@ const onQuerySubmit = async () => {
       ElMessage.error('请选择查询表名')
       return
     }
+    console.log('research_field value:', queryForm.value.research_field)
     const payload = {
       table: queryForm.value.table,
       filters: queryForm.value.filters,
-      research_field: queryForm.value.research_field,
+      research_field: queryForm.value.research_field
+        .map((name) => {
+          const match = research_fields.value.find((field) => field.research_field === name)
+          return match ? match.id : null
+        })
+        .filter((id) => id !== null), // 过滤掉找不到的
     }
     const response = await request.post('query/', payload)
     responseData.value = response.data
@@ -247,7 +257,7 @@ onMounted(() => {
           >
             <el-option label="学生表" value="student" />
             <el-option label="教职工表" value="teacher" />
-            <el-option label="科研教职工表" value="project" />
+            <el-option label="科研项目表" value="project" />
           </el-select>
         </el-form-item>
         <div class="query-form-items">
@@ -279,7 +289,7 @@ onMounted(() => {
               v-else
               type="textarea"
               :autosize="{ minRows: 1, maxRows: 6 }"
-              v-model="formData[field]"
+              v-model="queryForm.filters[field]"
               style="width: 80%"
             />
           </el-form-item>
@@ -487,8 +497,9 @@ onMounted(() => {
 }
 .query-result {
   color: black;
-  max-height: 60vh; /* 限制最大高度 */
+  /* max-height: 60vh; 限制最大高度 */
   overflow: auto; /* 添加垂直滚动 */
+  height: 100%;
   flex: 1;
   margin-top: 20px;
   padding: 10px 10px 0px 10px;

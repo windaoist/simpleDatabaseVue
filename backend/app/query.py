@@ -166,10 +166,10 @@ class QueryResource(Resource):
             if table == 'Project':
                 if role == 'Student':
                     wheres.append(
-                        "FIND_IN_SET(%s, leader_names) > 0 OR FIND_IN_SET(%s, member_names) > 0")
+                        "FIND_IN_SET(%s, leader) > 0 OR FIND_IN_SET(%s, member) > 0")
                     sql_params += [username, username]
                 elif role == 'Teacher':
-                    wheres.append("FIND_IN_SET(%s, teacher_names) > 0")
+                    wheres.append("FIND_IN_SET(%s, teacher) > 0")
                     sql_params.append(username)
 
             # 拼接SQL
