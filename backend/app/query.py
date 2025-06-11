@@ -128,9 +128,7 @@ class QueryResource(Resource):
                     WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})
                     GROUP BY project_id
                     HAVING COUNT(DISTINCT research_field) = %s
-                    """,
-                    research_field_ids + [len(research_field_ids)]
-                )
+                    """, research_field_ids + [len(research_field_ids)])
                 field_project_ids = [str(row['project_id']) for row in cursor.fetchall()]
                 if not field_project_ids:
                     return api_response(True, '暂无匹配研究领域的项目', data={'results': [], 'query_params': data})
@@ -138,6 +136,38 @@ class QueryResource(Resource):
                 placeholders = ','.join(['%s'] * len(field_project_ids))
                 wheres.append(f"project_id IN ({placeholders})")
                 sql_params += field_project_ids
+            elif table.lower() == 'student' and research_field_ids:
+                cursor.execute(
+                    f"""
+                    SELECT student_id
+                    FROM StudentResearchField
+                    WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})
+                    GROUP BY student_id
+                    HAVING COUNT(DISTINCT research_field) = %s
+                    """, research_field_ids + [len(research_field_ids)])
+                field_student_ids = [str(row['student_id']) for row in cursor.fetchall()]
+                if not field_student_ids:
+                    return api_response(True, '暂无匹配研究领域的学生', data={'results': [], 'query_params': data})
+
+                placeholders = ','.join(['%s'] * len(field_student_ids))
+                wheres.append(f"student_id IN ({placeholders})")
+                sql_params += field_student_ids
+            elif table.lower() == 'teacher' and research_field_ids:
+                cursor.execute(
+                    f"""
+                    SELECT teacher_id
+                    FROM TeacherResearchField
+                    WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})
+                    GROUP BY teacher_id
+                    HAVING COUNT(DISTINCT research_field) = %s
+                    """, research_field_ids + [len(research_field_ids)])
+                field_teacher_ids = [str(row['teacher_id']) for row in cursor.fetchall()]
+                if not field_teacher_ids:
+                    return api_response(True, '暂无匹配研究领域的教师', data={'results': [], 'query_params': data})
+
+                placeholders = ','.join(['%s'] * len(field_teacher_ids))
+                wheres.append(f"teacher_id IN ({placeholders})")
+                sql_params += field_teacher_ids
 
             # 权限控制逻辑（仅Project表启用）
             if table.lower() == 'project':
