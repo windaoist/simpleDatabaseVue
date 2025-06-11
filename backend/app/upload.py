@@ -274,8 +274,8 @@ def import_project_data(file):
 
                 # 插入项目主表
                 cursor.execute(
-                    "INSERT INTO Project (project_id, name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
-                    "VALUES (%s, %s, %s, %s, %s, %s)", (project_id, row['name'], row['project_content'], row['project_application_status'],
+                    "INSERT INTO Project (project_id, project_name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)", (project_id, row['project_name'], row['project_content'], row['project_application_status'],
                                                         row['project_approval_status'], row['project_acceptance_status']))
                 inserted_count += 1
 
