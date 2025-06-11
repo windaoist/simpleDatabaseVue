@@ -55,20 +55,20 @@ class Login(Resource):
             connection = get_db_connection()
             cursor = connection.cursor()
 
-            # 教职工（专家表）
+            # 教职工
             if role == 'Teacher':
                 cursor.execute(
-                    "SELECT * FROM Expert WHERE expert_name = %s", (username, ))
+                    "SELECT * FROM Expert WHERE teacher_id = %s", (username, ))
                 user = cursor.fetchone()
                 if not user:
                     return api_response(False, '教职工账号不存在', status=404)
                 if password != username:
                     return api_response(False, '密码错误', status=401)
 
-            # 学生（基金表）
+            # 学生
             elif role == 'Student':
                 cursor.execute(
-                    "SELECT * FROM Fund WHERE fund_name = %s", (username, ))
+                    "SELECT * FROM Fund WHERE student_id = %s", (username, ))
                 user = cursor.fetchone()
                 if not user:
                     return api_response(False, '学生账号不存在', status=404)

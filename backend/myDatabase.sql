@@ -167,27 +167,36 @@ CREATE OR REPLACE VIEW view_project AS
 SELECT
     p.project_id,
     p.project_name,
-    -- 拼接多个研究领域名称（去重 + 顿号分隔）
+    -- 拼接研究领域
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field,
-    -- 负责人（顿号拼接）
-    GROUP_CONCAT(DISTINCT CASE WHEN sp.role = '负责人' THEN s.name END SEPARATOR '、') AS leader,
-    -- 成员（顿号拼接）
-    GROUP_CONCAT(DISTINCT CASE WHEN sp.role = '成员' THEN s.name END SEPARATOR '、') AS member,
-    -- 指导老师（顿号拼接）
-    GROUP_CONCAT(DISTINCT t.name SEPARATOR '、') AS teacher,
-    -- 状态字段
+    -- 负责人
+    (
+        SELECT GROUP_CONCAT(s.name SEPARATOR '、')
+        FROM StudentProject sp
+        JOIN Student s ON sp.student_id = s.student_id
+        WHERE sp.project_id = p.project_id AND sp.role = '负责人'
+    ) AS leader,
+    -- 成员
+    (
+        SELECT GROUP_CONCAT(s.name SEPARATOR '、')
+        FROM StudentProject sp
+        JOIN Student s ON sp.student_id = s.student_id
+        WHERE sp.project_id = p.project_id AND sp.role = '成员'
+    ) AS member,
+    -- 指导教师
+    (
+        SELECT GROUP_CONCAT(t.name SEPARATOR '、')
+        FROM TeacherProject tp
+        JOIN Teacher t ON tp.teacher_id = t.teacher_id
+        WHERE tp.project_id = p.project_id
+    ) AS teacher,
+    -- 项目状态字段
     p.project_application_status,
     p.project_approval_status,
     p.project_acceptance_status
 FROM Project p
--- 连接多研究领域关系表
 LEFT JOIN ProjectResearchField prf ON p.project_id = prf.project_id
 LEFT JOIN ResearchFields rf ON prf.research_field = rf.id
--- 关联逻辑
-LEFT JOIN StudentProject sp ON p.project_id = sp.project_id
-LEFT JOIN Student s ON sp.student_id = s.student_id
-LEFT JOIN TeacherProject tp ON p.project_id = tp.project_id
-LEFT JOIN Teacher t ON tp.teacher_id = t.teacher_id
 GROUP BY p.project_id;
 
 
