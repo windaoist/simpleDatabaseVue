@@ -120,9 +120,16 @@ class QueryResource(Resource):
 
             # 前端传的是研究领域ID列表，必须关联 ProjectResearchField 表来筛选 project_id
             if table.lower() == 'project' and research_field_ids:
+                # 查找同时包含所有 research_field_ids 的项目
                 cursor.execute(
-                    f"SELECT DISTINCT project_id FROM ProjectResearchField WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})",
-                    research_field_ids
+                    f"""
+                    SELECT project_id
+                    FROM ProjectResearchField
+                    WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})
+                    GROUP BY project_id
+                    HAVING COUNT(DISTINCT research_field) = %s
+                    """,
+                    research_field_ids + [len(research_field_ids)]
                 )
                 field_project_ids = [str(row['project_id']) for row in cursor.fetchall()]
                 if not field_project_ids:
