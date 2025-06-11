@@ -207,7 +207,7 @@ class QueryResource(Resource):
                 row['序号'] = idx
                 results.append({COLUMN_MAPPING.get(k, k): v for k, v in row.items()})
 
-            related_data = get_related_data_api(cursor, table, research_field_ids) if research_field_ids else {}
+            related_data = get_related_data_api(cursor, table, research_field_ids) if research_field_ids else {'相关学生': [], '相关教职工': [], '相关科研项目': []}
 
             return {
                 'success': True,
