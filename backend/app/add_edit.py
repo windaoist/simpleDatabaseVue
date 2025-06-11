@@ -64,7 +64,6 @@ edit_parser.add_argument('old_key', type=str, required=True, help='原主键ID',
 
 @ns.route('/add')
 class AddData(Resource):
-
     @ns.expect(
         ns.model('AddRequest', {
             'table': fields.String(required=True, enum=['Student', 'Teacher', 'Project'], description='表名'),
