@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
-// import * as translate from '@/stores/LanguageConverter.ts'
+import * as translate from '@/stores/LanguageConverter'
+import { getAttribute } from '@/stores/TableStructure'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const queryForm = ref({
-  table: 'Expert',
+  table: '',
   filters: {},
   research_field: [],
 })
 const fields = ref([])
 const secondFieldKey = ref('')
 const formData = ref({})
-const industries = ref()
+const research_fields = ref()
 const currentForm = ref()
 // const editingState = reactive({});
 // const editedData = ref([]);
@@ -20,9 +21,9 @@ const responseData = ref({
   data: {
     results: [],
     related_data: {
-      related_experts: [],
+      related_students: [],
+      related_teachers: [],
       related_projects: [],
-      related_funds: [],
     },
   },
 })
@@ -31,22 +32,15 @@ const activeName = ref()
 const columnOrder = ref([])
 async function onTableChange() {
   try {
-    const response = await request.get('query/', {
-      params: {
-        table: queryForm.value.table,
-      },
-    })
-    if (response.data.success) {
-      fields.value = Object.keys(response.data.data.results[0]).filter((key) => key !== '序号')
-      // 记录第二个字段 key
-      if (fields.value.length >= 2) {
-        secondFieldKey.value = fields.value[1]
-      }
-      fields.value.forEach((key) => {
-        formData[key] = ''
-      })
-      console.log('获取表格式成功', fields.value)
+    if (!queryForm.value.table) {
+      ElMessage.error('请选择查询表名')
+      return
     }
+    // 获取表结构
+    const attributes = await getAttribute(queryForm.value.table)
+    fields.value = attributes
+    secondFieldKey.value = attributes[1] || ''
+    console.log('表结构:', fields.value)
   } catch (error) {
     ElMessage.error('获取表格式失败，' + error.message)
   }
@@ -57,13 +51,12 @@ const onQuerySubmit = async () => {
       ElMessage.error('请选择查询表名')
       return
     }
-    const response = await request.get('query/', {
-      params: {
-        table: '',
-        filters: {},
-        research_field: [],
-      },
-    })
+    const payload = {
+      table: queryForm.value.table,
+      filters: queryForm.value.filters,
+      research_field: queryForm.value.research_field,
+    }
+    const response = await request.post('query/', payload)
     responseData.value = response.data
     currentForm.value = queryForm.value.table // 保存当前查询表单数据
     // 新增：为每一行添加原始列顺序
@@ -208,33 +201,33 @@ const editingContent = ref('')
 const contentDialogVisible = ref(false)
 function openContentDialog(row) {
   editingRow.value = row
-  editingContent.value = row['项目内容'] || ''
+  editingContent.value = row['教职工内容'] || ''
   contentDialogVisible.value = true
 }
 
-function handleDialogSave() {
-  if (editingRow.value) {
-    editingRow.value['项目内容'] = editingContent.value
-  }
-  contentDialogVisible.value = false
-}
+// function handleDialogSave() {
+//   if (editingRow.value) {
+//     editingRow.value['教职工内容'] = editingContent.value
+//   }
+//   contentDialogVisible.value = false
+// }
 
-function handleDialogClose() {
-  contentDialogVisible.value = false
-}
+// function handleDialogClose() {
+//   contentDialogVisible.value = false
+// }
 
 async function fetchFields() {
   try {
     const response = await request.get('query/research_fields')
-    industries.value = response.data.data.industries
-    console.log('行业列表:', industries.value)
+    research_fields.value = response.data.data.research_fields
+    console.log('行业列表:', research_fields.value)
   } catch (error) {
     console.error('获取行业列表失败:', error)
   }
 }
 onMounted(() => {
   // 初始化行业列表
-  // fetchIndustries()
+  fetchFields()
 })
 // 行样式（编辑状态背景色）
 // const getRowClassName = ({ row }) => {
@@ -244,40 +237,71 @@ onMounted(() => {
 <template>
   <div>
     <div class="query-view">
-      <el-form :inline="true" :model="queryForm">
+      <el-form :inline="true" label-position="left" label-width="80px" :model="queryForm">
+        <el-form-item label="查询表名">
+          <el-select
+            v-model="queryForm.table"
+            @change="onTableChange()"
+            placeholder="请选择查询表名"
+            style="width: 220px"
+          >
+            <el-option label="学生表" value="student" />
+            <el-option label="教职工表" value="teacher" />
+            <el-option label="科研教职工表" value="project" />
+          </el-select>
+        </el-form-item>
         <div class="query-form-items">
-          <el-form-item label="查询表名">
+          <el-form-item
+            v-for="field in fields"
+            :key="field"
+            :label="translate.translateToChinese(field)"
+            style="flex: 1; min-width: 200px"
+          >
+            <!-- 特殊处理“研究领域”为下拉框 -->
             <el-select
-              v-model="queryForm.table"
-              @change="onTableChange()"
-              placeholder="请选择查询表名"
-              style="width: 220px"
+              v-if="field === 'research_field'"
+              v-model="queryForm.research_field"
+              multiple
+              collapse-tags
+              placeholder="请选择研究领域"
+              style="width: 100%"
             >
-              <el-option label="专家表" value="Expert"></el-option>
-              <el-option label="项目表" value="Project"></el-option>
-              <el-option label="基金表" value="Fund"></el-option>
+              <el-option
+                v-for="field in research_fields"
+                :key="field.id"
+                :label="field.research_field"
+                :value="field.research_field"
+              />
             </el-select>
-          </el-form-item>
 
-          <el-form-item>
-            <el-button type="primary" @click="onQuerySubmit" class="submit-btn">查询</el-button>
-            <el-button
-              type="success"
-              @click="onDownload"
-              :disabled="!responseData.data"
-              class="download-btn"
-              >导出</el-button
-            >
+            <!-- 默认使用文本域 -->
+            <el-input
+              v-else
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 6 }"
+              v-model="formData[field]"
+              style="width: 80%"
+            />
           </el-form-item>
         </div>
+        <el-form-item>
+          <el-button type="primary" @click="onQuerySubmit" class="submit-btn">查询</el-button>
+          <el-button
+            type="success"
+            @click="onDownload"
+            :disabled="!responseData.data"
+            class="download-btn"
+            >导出</el-button
+          >
+        </el-form-item>
       </el-form>
     </div>
     <!-- <div>
    <p>{{responseData}}</p>
 </div> -->
-    <el-dialog
+    <!-- <el-dialog
       v-model="contentDialogVisible"
-      title="编辑项目内容"
+      title="编辑教职工内容"
       width="60%"
       :before-close="handleDialogClose"
     >
@@ -285,14 +309,14 @@ onMounted(() => {
         type="textarea"
         v-model="editingContent"
         :rows="10"
-        placeholder="请输入项目内容"
+        placeholder="请输入教职工内容"
         style="width: 100%"
       />
       <template #footer>
         <el-button @click="handleDialogClose">取消</el-button>
         <el-button type="primary" @click="handleDialogSave">保存</el-button>
       </template>
-    </el-dialog>
+    </el-dialog> -->
     <el-tabs class="query-result" v-model="activeName" v-if="responseData.data">
       <el-tab-pane label="查询结果" name="query-result">
         <div class="section" v-if="responseData.data.results.length > 0">
@@ -310,8 +334,8 @@ onMounted(() => {
             >
               <template #default="{ row }">
                 <template v-if="isEditing(row)">
-                  <!-- 如果是项目内容字段，使用弹窗 -->
-                  <template v-if="key === '项目内容'">
+                  <!-- 如果是教职工内容字段，使用弹窗 -->
+                  <template v-if="key === '教职工内容'">
                     <el-button @click="openContentDialog(row)" size="small">编辑内容</el-button>
                   </template>
                   <template v-else>
@@ -351,12 +375,16 @@ onMounted(() => {
         <div v-else>无查询结果</div>
       </el-tab-pane>
       <!-- 相关数据展示 -->
-      <el-tab-pane label="相关专家" name="related-experts">
-        <!-- 相关专家 -->
-        <div class="section" v-if="responseData.data.related_data.related_experts.length > 0">
-          <el-table :data="responseData.data.related_data.related_experts" border :max-height="500">
+      <el-tab-pane label="相关学生" name="related-students" v-if="false">
+        <!-- 相关学生 -->
+        <div class="section" v-if="responseData.data.related_data.related_students.length > 0">
+          <el-table
+            :data="responseData.data.related_data.related_students"
+            border
+            :max-height="500"
+          >
             <el-table-column
-              v-for="(value, key) in responseData.data.related_data.related_experts[0]"
+              v-for="(value, key) in responseData.data.related_data.related_students[0]"
               :key="key"
               :prop="key"
               :label="key"
@@ -364,10 +392,29 @@ onMounted(() => {
             </el-table-column>
           </el-table>
         </div>
-        <div v-else>无相关专家</div>
+        <div v-else>无相关学生</div>
       </el-tab-pane>
-      <!-- 相关项目 -->
-      <el-tab-pane label="相关项目" name="related-projects">
+      <!-- 相关教职工 -->
+      <el-tab-pane label="相关教职工" name="related-teachers" v-if="false">
+        <div class="section" v-if="responseData.data.related_data.related_teachers.length > 0">
+          <el-table
+            :data="responseData.data.related_data.related_teachers"
+            border
+            :max-height="500"
+          >
+            <el-table-column
+              v-for="(value, key) in responseData.data.related_data.related_teachers[0]"
+              :key="key"
+              :prop="key"
+              :label="key"
+            >
+            </el-table-column>
+          </el-table>
+        </div>
+        <div v-else>无相关教职工</div>
+      </el-tab-pane>
+      <!-- 相关教职工 -->
+      <el-tab-pane label="相关教职工" name="related-projects" v-if="false">
         <div class="section" v-if="responseData.data.related_data.related_projects.length > 0">
           <el-table
             :data="responseData.data.related_data.related_projects"
@@ -383,22 +430,7 @@ onMounted(() => {
             </el-table-column>
           </el-table>
         </div>
-        <div v-else>无相关项目</div>
-      </el-tab-pane>
-      <!-- 相关基金 -->
-      <el-tab-pane label="相关基金" name="related-funds">
-        <div class="section" v-if="responseData.data.related_data.related_funds.length > 0">
-          <el-table :data="responseData.data.related_data.related_funds" border :max-height="500">
-            <el-table-column
-              v-for="(value, key) in responseData.data.related_data.related_funds[0]"
-              :key="key"
-              :prop="key"
-              :label="key"
-            >
-            </el-table-column>
-          </el-table>
-        </div>
-        <div v-else>无相关基金</div>
+        <div v-else>无相关教职工</div>
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -414,15 +446,10 @@ onMounted(() => {
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
-@media (max-width: 768px) {
-  .query-view {
-    height: fit-content;
-    overflow-y: auto;
-  }
-}
+
 .query-form-items {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   max-width: 1200px;
   margin: 10px auto;
@@ -468,6 +495,12 @@ onMounted(() => {
   background-color: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.102);
+}
+@media (max-width: 768px) {
+  .query-view {
+    height: fit-content;
+    overflow-y: auto;
+  }
 }
 /* 编辑行背景色
 :deep(.el-table .editing-row) {
