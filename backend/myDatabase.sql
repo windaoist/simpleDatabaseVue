@@ -167,6 +167,7 @@ CREATE OR REPLACE VIEW view_project AS
 SELECT
     p.project_id,
     p.project_name,
+    p.project_content,
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field,
     -- 负责人显示为 姓名(学号)
     (

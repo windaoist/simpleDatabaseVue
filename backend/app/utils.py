@@ -68,20 +68,20 @@ def get_related_data_api(cursor, table, field_ids):
     """
     查询与当前研究领域完全匹配的相关学生、教师、项目（排除自身表）
     """
-    related_data = {'related_students': [], 'related_teachers': [], 'related_projects': []}
+    related_data = {'相关学生': [], '相关教职工': [], '相关科研项目': []}
 
     relation_map = {
-        'Student': ('StudentResearchField', 'student_id', 'view_student', 'related_students'),
-        'Teacher': ('TeacherResearchField', 'teacher_id', 'view_teacher', 'related_teachers'),
-        'Project': ('ProjectResearchField', 'project_id', 'view_project', 'related_projects'),
+        'Student': ('StudentResearchField', 'student_id', 'view_student', '相关学生'),
+        'Teacher': ('TeacherResearchField', 'teacher_id', 'view_teacher', '相关教职工'),
+        'Project': ('ProjectResearchField', 'project_id', 'view_project', '相关科研项目'),
     }
 
     for related_table, (middle_table, id_field, view_name, target_key) in relation_map.items():
         if related_table == table:
-            continue  # 排除当前表自身
+            continue  # 跳过当前主表
 
         try:
-            # 构造 SQL：查找完全包含所有研究领域的ID列表
+            # 精确匹配研究领域：完全包含全部 field_ids 的记录
             cursor.execute(
                 f"""
                 SELECT {id_field}
@@ -102,6 +102,7 @@ def get_related_data_api(cursor, table, field_ids):
             for idx, row in enumerate(rows, 1):
                 row = dict(row)
                 row['序号'] = idx
+                row = {COLUMN_MAPPING.get(k, k): v for k, v in row.items()}  # 字段名转中文
                 related_data[target_key].append(row)
 
         except Exception as e:
