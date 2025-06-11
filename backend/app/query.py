@@ -118,11 +118,19 @@ class QueryResource(Resource):
                     wheres.append(f"{field} LIKE %s")
                     sql_params.append(f"%{keyword}%")
 
-            # 研究领域 REGEXP
-            if 'research_field' in valid_fields and research_field_ids:
-                pattern = '|'.join(map(str, research_field_ids))
-                wheres.append("research_field REGEXP %s")
-                sql_params.append(pattern)
+            # 前端传的是研究领域ID列表，必须关联 ProjectResearchField 表来筛选 project_id
+            if table.lower() == 'project' and research_field_ids:
+                cursor.execute(
+                    f"SELECT DISTINCT project_id FROM ProjectResearchField WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})",
+                    research_field_ids
+                )
+                field_project_ids = [str(row['project_id']) for row in cursor.fetchall()]
+                if not field_project_ids:
+                    return api_response(True, '暂无匹配研究领域的项目', data={'results': [], 'query_params': data})
+
+                placeholders = ','.join(['%s'] * len(field_project_ids))
+                wheres.append(f"project_id IN ({placeholders})")
+                sql_params += field_project_ids
 
             # 权限控制逻辑（仅Project表启用）
             if table.lower() == 'project':
