@@ -68,7 +68,6 @@ edit_parser.add_argument(
 
 @ns.route('/add')
 class AddData(Resource):
-
     @ns.expect(
         ns.model('AddRequest', {
             'table': fields.String(required=True, enum=['Student', 'Teacher', 'Project'], description='表名'),
