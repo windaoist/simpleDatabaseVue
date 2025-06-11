@@ -166,7 +166,7 @@ DELIMITER ;
 CREATE OR REPLACE VIEW view_project AS
 SELECT
     p.project_id,
-    p.name AS project_name,
+    p.project_name,
     -- 拼接多个研究领域名称（去重 + 顿号分隔）
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field,
     -- 负责人（顿号拼接）
