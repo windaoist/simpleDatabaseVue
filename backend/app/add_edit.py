@@ -284,7 +284,7 @@ class EditData(Resource):
         response_data = {'table': table}
 
         try:
-            if table == 'Student':
+            if table == 'student':
                 if role != 'Admin':
                     return api_response(False, '仅管理员可编辑学生信息', status=403)
 
@@ -310,7 +310,7 @@ class EditData(Resource):
                     cursor.execute("INSERT INTO StudentResearchField (student_id, research_field) VALUES (%s, %s)", (new_key, rf_id))
                 response_data['record'] = {'student_id': new_key}
 
-            elif table == 'Teacher':
+            elif table == 'teacher':
                 if role != 'Admin':
                     return api_response(False, '仅管理员可编辑教师信息', status=403)
 
@@ -336,7 +336,7 @@ class EditData(Resource):
                     cursor.execute("INSERT INTO TeacherResearchField (teacher_id, research_field) VALUES (%s, %s)", (new_key, rf_id))
                 response_data['record'] = {'teacher_id': new_key}
 
-            elif table == 'Project':
+            elif table == 'project':
                 new_key = record_data.get('project_id')
                 if new_key != old_key:
                     cursor.execute("SELECT 1 FROM Project WHERE project_id=%s", (new_key, ))
@@ -441,8 +441,8 @@ class DeleteData(Resource):
         cursor = connection.cursor()
 
         try:
-            if table == 'Project':
-                # 查询审批状态
+            if table == 'project':
+                # 查询项目状态
                 cursor.execute("SELECT project_approval_status, project_acceptance_status FROM Project WHERE project_id=%s", (key, ))
                 row = cursor.fetchone()
                 if not row:
@@ -451,11 +451,11 @@ class DeleteData(Resource):
                 approval_status = row['project_approval_status']
                 acceptance_status = row['project_acceptance_status']
 
-                # 已审批/验收项目只能由 Admin 删除
+                # 审批通过/验收通过仅限 Admin 删除
                 if (approval_status == '审批通过' or acceptance_status == '验收通过') and role != 'Admin':
                     return api_response(False, '项目已审批或验收，仅管理员可删除', status=403)
 
-                # 权限校验
+                # 权限校验：学生必须是负责人，教师必须是指导老师
                 if role == 'Student':
                     cursor.execute("SELECT 1 FROM StudentProject WHERE project_id=%s AND student_id=%s AND role='负责人'", (key, user_id))
                     if not cursor.fetchone():
@@ -465,27 +465,29 @@ class DeleteData(Resource):
                     if not cursor.fetchone():
                         return api_response(False, '无权删除该项目（不是指导老师）', status=403)
 
-                # 删除项目及其关联信息
-                cursor.execute("DELETE FROM Project WHERE project_id=%s", (key, ))
+                # 删除项目关联信息（先删从表，再删主表）
                 cursor.execute("DELETE FROM ProjectResearchField WHERE project_id=%s", (key, ))
                 cursor.execute("DELETE FROM TeacherProject WHERE project_id=%s", (key, ))
                 cursor.execute("DELETE FROM StudentProject WHERE project_id=%s", (key, ))
+                cursor.execute("DELETE FROM Project WHERE project_id=%s", (key, ))
 
-            elif table == 'Student':
+            elif table == 'student':
                 if role != 'Admin':
                     return api_response(False, '仅管理员可删除学生信息', status=403)
 
-                cursor.execute("DELETE FROM Student WHERE student_id=%s", (key, ))
+                # 删除学生关联信息
                 cursor.execute("DELETE FROM StudentResearchField WHERE student_id=%s", (key, ))
                 cursor.execute("DELETE FROM StudentProject WHERE student_id=%s", (key, ))
+                cursor.execute("DELETE FROM Student WHERE student_id=%s", (key, ))
 
-            elif table == 'Teacher':
+            elif table == 'teacher':
                 if role != 'Admin':
                     return api_response(False, '仅管理员可删除教师信息', status=403)
 
-                cursor.execute("DELETE FROM Teacher WHERE teacher_id=%s", (key, ))
+                # 删除教师关联信息
                 cursor.execute("DELETE FROM TeacherResearchField WHERE teacher_id=%s", (key, ))
                 cursor.execute("DELETE FROM TeacherProject WHERE teacher_id=%s", (key, ))
+                cursor.execute("DELETE FROM Teacher WHERE teacher_id=%s", (key, ))
 
             else:
                 return api_response(False, '不支持的表名', status=400)
