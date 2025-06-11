@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
@@ -20,7 +20,7 @@ const account = ref({
   password: '',
   role: '',
 })
-const LoggedIn = computed(() => !!localStorage.getItem('jwt_token'))
+const isLoggedIn = ref(!!localStorage.getItem('jwt_token'))
 async function handleLogin() {
   if (account.value.username === '' || account.value.password === '' || account.value.role === '') {
     ElMessage.error('用户名，密码或类别不能为空')
@@ -36,6 +36,7 @@ async function handleLogin() {
     return
   }
   loginDialogVisible.value = false
+  isLoggedIn.value = true
   console.log('登录成功', account.value)
   ElMessage.success('登录成功')
 }
@@ -43,6 +44,7 @@ async function handleLogout() {
   try {
     // await request.post('/auth/logout')
     localStorage.removeItem('jwt_token')
+    isLoggedIn.value = false
     // LoggedIn.value = false
     ElMessage.success('注销成功')
   } catch (error) {
@@ -110,7 +112,7 @@ onMounted(() => {
           <div class="auth-button">
             <el-button
               type="primary"
-              v-if="!LoggedIn"
+              v-if="!isLoggedIn"
               class="icon-wrapper"
               @click="loginDialogVisible = true"
             >

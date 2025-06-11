@@ -11,7 +11,7 @@ const queryForm = ref({
   research_field: [],
 })
 const fields = ref([])
-const secondFieldKey = ref('')
+// const secondFieldKey = ref('')
 // const formData = ref({
 //   table: '',
 //   filters: {},
@@ -43,7 +43,7 @@ async function onTableChange() {
     // 获取表结构
     const attributes = await getAttribute(queryForm.value.table)
     fields.value = attributes
-    secondFieldKey.value = attributes[1] || ''
+    // secondFieldKey.value = attributes[1] || ''
     console.log('表结构:', fields.value)
   } catch (error) {
     ElMessage.error('获取表格式失败，' + error.message)
@@ -206,14 +206,14 @@ async function onDownload() {
     ElMessage.error('导出失败:' + error.message)
   }
 }
-const editingRow = ref()
-const editingContent = ref('')
-const contentDialogVisible = ref(false)
-function openContentDialog(row) {
-  editingRow.value = row
-  editingContent.value = row['教职工内容'] || ''
-  contentDialogVisible.value = true
-}
+// const editingRow = ref()
+// const editingContent = ref('')
+// const contentDialogVisible = ref(false)
+// function openContentDialog(row) {
+//   editingRow.value = row
+//   editingContent.value = row['教职工内容'] || ''
+//   contentDialogVisible.value = true
+// }
 
 // function handleDialogSave() {
 //   if (editingRow.value) {
@@ -345,10 +345,10 @@ onMounted(() => {
               <template #default="{ row }">
                 <template v-if="isEditing(row)">
                   <!-- 如果是教职工内容字段，使用弹窗 -->
-                  <template v-if="key === '教职工内容'">
+                  <!-- <template v-if="key === '教职工内容'">
                     <el-button @click="openContentDialog(row)" size="small">编辑内容</el-button>
-                  </template>
-                  <template v-else>
+                  </template> -->
+                  <template>
                     <el-input
                       v-model="row[key]"
                       type="textarea"

@@ -3,29 +3,27 @@ import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
 import * as translate from '@/stores/LanguageConverter'
 import { ElMessage } from 'element-plus'
-const currentTable = ref('Expert')
+import { getAttribute } from '@/stores/TableStructure'
+const currentTable = ref('student')
 const fields = ref([])
-const formData = ref({})
-const industries = ref([])
+const formData = ref({
+  table: '',
+  filters: {},
+  research_field: [],
+})
+const research_fields = ref([])
 const secondFieldKey = ref('')
 async function onQuery() {
   try {
-    const response = await request.get('query/', {
-      params: {
-        table: currentTable.value,
-      },
-    })
-    if (response.data.success) {
-      fields.value = Object.keys(response.data.data.results[0]).filter((key) => key !== '序号')
-      // 记录第二个字段 key
-      if (fields.value.length >= 2) {
-        secondFieldKey.value = fields.value[1]
-      }
-      fields.value.forEach((key) => {
-        formData[key] = ''
-      })
-      console.log('获取表格式成功', fields.value)
+    if (!currentTable.value) {
+      ElMessage.error('请选择查询表名')
+      return
     }
+    // 获取表结构
+    const attributes = await getAttribute(currentTable.value)
+    fields.value = attributes
+    secondFieldKey.value = attributes[1] || ''
+    console.log('表结构:', fields.value)
   } catch (error) {
     ElMessage.error('获取表格式失败，' + error.message)
   }
@@ -34,7 +32,7 @@ async function handleSubmit() {
   const processedData = { ...formData.value }
   // 处理第二个字段：如果匹配 industries，替换为 id
   const secondFieldValue = formData.value[secondFieldKey.value]
-  const matchedIndustry = industries.value.find(
+  const matchedIndustry = research_fields.value.find(
     (industry) => industry.industry_name === secondFieldValue,
   )
 
@@ -61,7 +59,11 @@ async function handleSubmit() {
       ElMessage.success(response.data.message)
       // 清空表单数据
       fields.value = []
-      formData.value = {}
+      formData.value = {
+        table: '',
+        filters: {},
+        research_field: [],
+      }
     } else {
       ElMessage.error(response.data.message)
     }
@@ -70,18 +72,18 @@ async function handleSubmit() {
     ElMessage.error('提交数据失败，' + error.message)
   }
 }
-async function fetchIndustries() {
+async function fetchFields() {
   try {
-    const response = await request.get('add-edit/industries')
-    industries.value = response.data.data.industries
-    console.log('行业列表:', industries.value)
+    const response = await request.get('query/research_fields')
+    research_fields.value = response.data.data.research_fields
+    console.log('行业列表:', research_fields.value)
   } catch (error) {
     console.error('获取行业列表失败:', error)
   }
 }
 onMounted(() => {
   // 初始化行业列表
-  fetchIndustries()
+  fetchFields()
   onQuery() // 默认查询专家表
 })
 </script>
@@ -95,9 +97,9 @@ onMounted(() => {
         placeholder="请选择添加表表名"
         style="width: 220px"
       >
-        <el-option label="专家表" value="Expert"></el-option>
-        <el-option label="项目表" value="Project"></el-option>
-        <el-option label="基金表" value="Fund"></el-option>
+        <el-option label="学生表" value="student" />
+        <el-option label="教职工表" value="teacher" />
+        <el-option label="科研项目表" value="project" />
       </el-select>
       <!-- <el-button type="primary" @click="onQuery" style="margin-left: 10px;">
   查询
@@ -106,9 +108,13 @@ onMounted(() => {
     <div class="add-form" v-if="fields.length > 0">
       <el-form :model="formData" label-width="120px" ref="formRef">
         <div class="form-grid">
-          <el-form-item v-for="(field, index) in fields" :key="field" :label="field">
+          <el-form-item
+            v-for="field in fields"
+            :key="field"
+            :label="translate.translateToChinese(field)"
+          >
             <!-- 第二项为下拉框 -->
-            <el-select
+            <!-- <el-select
               v-if="index === 1"
               v-model="formData[field]"
               placeholder="请选择"
@@ -120,9 +126,24 @@ onMounted(() => {
                 :label="industry.industry_name"
                 :value="industry.industry_name"
               ></el-option>
-            </el-select>
+            </el-select> -->
 
             <!-- 其他项为文本域 -->
+            <el-select
+              v-if="field === 'research_field'"
+              v-model="formData.research_field"
+              multiple
+              collapse-tags
+              placeholder="请选择研究领域"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="field in research_fields"
+                :key="field.id"
+                :label="field.research_field"
+                :value="field.research_field"
+              />
+            </el-select>
             <el-input
               v-else
               type="textarea"
@@ -155,16 +176,20 @@ onMounted(() => {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   color: black;
 }
+
 .form-grid {
   display: flex;
+  justify-content: flex-start;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 16px; /* 间距可根据需要调整 */
-  margin-top: 20px;
+  max-width: 1200px;
+  margin: 10px auto;
+  padding: 0 10px;
+  gap: 10px; /* 添加间距 */
 }
 
-.form-grid .el-form-item {
-  flex: 1 1 calc(50% - 16px); /* 每项宽度为 50% 减去间距 */
+.el-form-item {
+  flex: 1 1 calc(50% - 16px);
   box-sizing: border-box;
+  width: 100%;
 }
 </style>

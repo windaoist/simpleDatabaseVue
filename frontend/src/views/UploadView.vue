@@ -20,7 +20,7 @@ async function uploadFile(option) {
       },
     })
     if (response.data) {
-      ElMessage.error(response.data.message || '上传失败，请稍后再试')
+      ElMessage.success(response.data.message || '上传成功')
       return
     }
     ElMessage.info('上传成功！')
