@@ -17,8 +17,7 @@ def api_response(success, message, data=None, status=200):
 
 
 def generate_token(username, role):
-    payload = {'username': username, 'role': role,
-               'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=6)}
+    payload = {'username': username, 'role': role, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=6)}
     return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
 
@@ -39,51 +38,32 @@ class Login(Resource):
         username = data.get('username')
         password = data.get('password')
         role = data.get('role')
-        # pdb.set_trace()  # 调试用，查看数据内容
+
         if not all([username, password, role]):
             return api_response(False, '缺少参数', status=400)
 
         try:
-            # Admin 登录
-            if role == 'Admin':
-                if username == 'Admin' and password == 'Admin':
-                    token = generate_token(username, role)
-                    return api_response(True, '登录成功', {'token': token, 'username': username, 'role': role})
-                else:
-                    return api_response(False, '管理员账号或密码错误', status=401)
-
             connection = get_db_connection()
             cursor = connection.cursor()
 
-            # 教职工
-            if role == 'Teacher':
-                cursor.execute(
-                    "SELECT * FROM teacher WHERE teacher_id = %s", (username, ))
-                user = cursor.fetchone()
-                if not user:
-                    return api_response(False, '教职工账号不存在', status=404)
-                if password != username:
-                    return api_response(False, '密码错误', status=401)
+            # 查询 Users 表中是否存在对应用户名、角色
+            cursor.execute("SELECT * FROM Users WHERE username = %s AND role = %s", (username, role))
+            user = cursor.fetchone()
 
-            # 学生
-            elif role == 'Student':
-                cursor.execute(
-                    "SELECT * FROM student WHERE student_id = %s", (username, ))
-                user = cursor.fetchone()
-                if not user:
-                    return api_response(False, '学生账号不存在', status=404)
-                if password != username:
-                    return api_response(False, '密码错误', status=401)
+            if not user:
+                return api_response(False, '账号不存在或角色不匹配', status=404)
 
-            else:
-                return api_response(False, '无效的用户角色', status=400)
+            if user['password'] != password:
+                return api_response(False, '密码错误', status=401)
 
             token = generate_token(username, role)
             return api_response(True, '登录成功', {'token': token, 'username': username, 'role': role})
 
         except Exception as e:
             return api_response(False, f'服务器错误: {str(e)}', status=500)
+
         finally:
-            if role != 'Admin':
+            if 'cursor' in locals():
                 cursor.close()
+            if 'connection' in locals():
                 connection.close()
