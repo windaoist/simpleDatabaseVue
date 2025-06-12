@@ -56,7 +56,7 @@ delete_parser = reqparse.RequestParser()
 delete_parser.add_argument('table', type=str, required=True, help='表名', location='json')
 delete_parser.add_argument('key', type=str, required=True, help='主键值', location='json')
 
-# 编辑操作解析器（更新为单主键结构）
+# 编辑操作解析器
 edit_parser = reqparse.RequestParser()
 edit_parser.add_argument('table', type=str, required=True, help='表名', location='json')
 edit_parser.add_argument('old_key', type=str, required=True, help='原主键ID', location='json')

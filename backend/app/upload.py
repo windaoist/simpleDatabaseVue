@@ -89,6 +89,10 @@ def import_student_data(file):
                 cursor.execute("INSERT INTO Student (student_id, name, gender, grade, major, class, phone, email) "
                                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                                (student_id, row['name'], row['gender'], row['grade'], row['major'], row['class'], row['phone'], row['email']))
+
+                # 添加用户记录（默认密码为学号）
+                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Student')", (student_id, student_id))
+
                 inserted_count += 1
 
                 # 处理研究方向（多对多插入）
@@ -169,6 +173,10 @@ def import_teacher_data(file):
                     "INSERT INTO Teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (teacher_id, row['name'], row['gender'], row['title'], row['college'], row['department'],
                                                                         row['phone'], row['email'], row['office_location'], row['introduction']))
+
+                # 添加用户记录（默认密码为工号）
+                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Teacher')", (teacher_id, teacher_id))
+
                 inserted_count += 1
 
                 # 处理研究方向（多对多插入）
