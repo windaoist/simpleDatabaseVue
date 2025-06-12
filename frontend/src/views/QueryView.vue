@@ -25,15 +25,16 @@ const responseData = ref({
   data: {
     results: [],
     related_data: {
-      related_students: [],
-      related_teachers: [],
-      related_projects: [],
+      相关学生: [],
+      相关教职工: [],
+      相关科研项目: [],
     },
   },
 })
 const activeName = ref()
 // 新增：用于存储原始列顺序
-const columnOrder = ref([])
+// const columnOrder = ref([])
+const primaryKey = ref()
 async function onTableChange() {
   try {
     if (!queryForm.value.table) {
@@ -43,6 +44,16 @@ async function onTableChange() {
     // 获取表结构
     const attributes = await getAttribute(queryForm.value.table)
     fields.value = attributes
+    responseData.value = {
+      data: {
+        results: [],
+        related_data: {
+          相关学生: [],
+          相关教职工: [],
+          相关科研项目: [],
+        },
+      },
+    }
     // secondFieldKey.value = attributes[1] || ''
     console.log('表结构:', fields.value)
   } catch (error) {
@@ -67,71 +78,88 @@ const onQuerySubmit = async () => {
         .filter((id) => id !== null), // 过滤掉找不到的
     }
     const response = await request.post('query/', payload)
+
     responseData.value = response.data
+    console.log(responseData.value.data)
     currentForm.value = queryForm.value.table // 保存当前查询表单数据
-    // 新增：为每一行添加原始列顺序
-    if (responseData.value.data && responseData.value.data.results.length > 0) {
-      // 获取除“序号”外的所有列名
-      const firstRow = responseData.value.data.results[0]
-      const keys = Object.keys(firstRow).filter((k) => k !== '序号')
-      columnOrder.value = keys
-      // 为每一行添加 __colOrder 字段
-      responseData.value.data.results.forEach((row) => {
-        row.__colOrder = [...keys]
-      })
+    // 获取除“序号”外的所有列名
+    // const firstRow = responseData.value.data.results[0]
+    // const keys = Object.keys(firstRow).filter((k) => k !== '序号')
+    // columnOrder.value = keys
+    // // 为每一行添加 __colOrder 字段
+    const results = responseData.value.data.results
+    if (results.length > 0) {
+      // 取第一项的第一个键
+      const firstItem = results[0]
+      const firstKey = Object.keys(firstItem)[0]
+      primaryKey.value = firstKey
+      console.log('当前主键字段名:', firstKey)
       activeName.value = 'query-result' // 切换到查询结果标签
+      console.log('查询结果:', responseData.value)
     }
-    console.log('查询结果:', responseData.value)
   } catch (error) {
     console.error('查询失败:', error)
-    ElMessage.error('查询失败：' + error.message)
+    ElMessage.error('查询失败：' + error.response?.data?.message)
   }
 }
 // 编辑状态
 const editingId = ref(null)
-const originalData = ref({})
+const originalData = ref()
 // 计算可编辑列（排除ID列），返回列名数组
 const editableColumns = computed(() => {
   if (!responseData.value.data.results.length) return []
   // 优先用 columnOrder
-  return columnOrder.value.length
-    ? columnOrder.value
-    : Object.keys(responseData.value.data.results[0]).filter(
-        (k) => k !== '序号' && k !== '__colOrder',
-      )
+  return fields.value.length
+    ? Object.values(fields.value).map((key) => translate.translateToChinese(key))
+    : Object.keys(responseData.value.data.results[0]).filter((k) => k !== '序号')
 })
 
 // 检查行是否在编辑状态
-const isEditing = (row) => {
-  return editingId.value === row.序号
+const isEditing = (index) => {
+  return editingId.value === index
 }
 
 // 处理编辑操作
-const handleEdit = (row) => {
+const handleEdit = (row, index) => {
   // 保存原始数据（深拷贝）
-  originalData.value[row.序号] = JSON.parse(JSON.stringify(row))
+  originalData.value = JSON.parse(JSON.stringify(row))
   // console.log('123', originalData.value[row.序号]);
-  editingId.value = row.序号
+  editingId.value = index
 }
 
 // 处理重置操作
 const handleReset = (row) => {
   // 恢复原始数据
-  Object.assign(row, originalData.value[row.序号])
+  Object.assign(row, originalData.value)
   editingId.value = null
+  originalData.value = null
 }
 // 处理提交操作
 const handleSubmit = async (row) => {
   try {
     console.log('提交数据:', row)
+    const primary = row[primaryKey.value]
+    const payload = {
+      table: currentForm.value,
+      old_key: primary,
+      data: {
+        ...Object.fromEntries(
+          Object.entries(row)
+            .filter(([k]) => k !== '序号')
+            .map(([k, v]) => [translate.translateToEnglish(k), v]),
+        ),
+      },
+    }
+    const response = await request.post('add-edit/edit', payload)
+    ElMessage.success('提交成功：' + response.data.message)
   } catch (error) {
     console.error('提交失败:', error)
-    ElMessage.error('提交失败:' + error.message)
+    ElMessage.error('提交失败:' + error.response?.data?.message)
   }
   // 清除编辑状态
   editingId.value = null
   // 移除备份数据
-  delete originalData.value[row.序号]
+  originalData.value = null
 }
 async function handleDelete(row) {
   try {
@@ -150,37 +178,23 @@ async function handleDelete(row) {
         console.log('用户取消删除')
         throw '取消' // 抛出异常以跳过后续操作
       })
-
-    const colOrder = row.__colOrder
-    const keys = {}
-    if (colOrder && colOrder.length >= 2) {
-      const [firstKey, secondKey] = colOrder.slice(0, 2)
-      keys[0] = row[firstKey]
-      keys[1] = row[secondKey]
-
-      // 构造 payload
-      const payload = {
-        table: currentForm.value,
-        key1: keys[0],
-        key2: keys[1],
-      }
-      console.log(row)
-      // 发送 POST 请求
-      const response = await request.post('/add-edit/delete', payload)
-
-      if (response.data && response.data.success) {
-        ElMessage.success('删除成功')
-        responseData.value.data.results = responseData.value.data.results.filter(
-          (item) => item[firstKey] !== keys[0] || item[secondKey] !== keys[1],
-        )
-      } else {
-        ElMessage.error(response.data?.message || '删除失败')
-      }
-    } else {
-      throw new Error('数据错误')
+    const primary = row[primaryKey.value]
+    const payload = {
+      table: currentForm.value,
+      key: primary,
     }
+    const response = request.post('add-edit/delete', payload)
+    ElMessage.success('删除成功：' + (await response).data.message)
+    // const colOrder = row.__colOrder
+    // const keys = {}
+    // if (colOrder && colOrder.length >= 2) {
+    //   const [firstKey, secondKey] = colOrder.slice(0, 2)
+    //   keys[0] = row[firstKey]
+    //   keys[1] = row[secondKey]
+
+    // 构造 payload
   } catch (error) {
-    ElMessage.error(error.message || '删除失败')
+    ElMessage.error('删除失败：' + error.response?.data?.message)
   }
 }
 async function onDownload() {
@@ -338,24 +352,17 @@ onMounted(() => {
             <el-table-column
               v-for="key in editableColumns"
               :key="key"
-              :prop="key"
               :label="key"
               :min-width="key.length * 15 + 30"
             >
-              <template #default="{ row }">
-                <template v-if="isEditing(row)">
-                  <!-- 如果是教职工内容字段，使用弹窗 -->
-                  <!-- <template v-if="key === '教职工内容'">
-                    <el-button @click="openContentDialog(row)" size="small">编辑内容</el-button>
-                  </template> -->
-                  <template>
-                    <el-input
-                      v-model="row[key]"
-                      type="textarea"
-                      :autosize="true"
-                      style="width: 100%"
-                    />
-                  </template>
+              <template #default="{ row, $index }">
+                <template v-if="isEditing($index)">
+                  <el-input
+                    v-model="row[key]"
+                    type="textarea"
+                    :autosize="true"
+                    style="width: 100%"
+                  />
                 </template>
                 <template v-else>
                   {{ row[key] }}
@@ -365,13 +372,13 @@ onMounted(() => {
 
             <!-- 固定操作列 -->
             <el-table-column label="操作" fixed="right" width="180">
-              <template #default="{ row }">
-                <div v-if="isEditing(row)">
+              <template #default="{ row, $index }">
+                <div v-if="isEditing($index)">
                   <el-button size="small" @click="handleReset(row)">重置</el-button>
                   <el-button size="small" type="primary" @click="handleSubmit(row)">提交</el-button>
                 </div>
                 <div v-else>
-                  <el-button size="small" @click="handleEdit(row)" :disabled="!!editingId">
+                  <el-button size="small" @click="handleEdit(row, $index)" :disabled="!!editingId">
                     编辑
                   </el-button>
                   <el-button size="small" @click="handleDelete(row)" :disabled="!!editingId">
@@ -385,16 +392,16 @@ onMounted(() => {
         <div v-else>无查询结果</div>
       </el-tab-pane>
       <!-- 相关数据展示 -->
-      <el-tab-pane label="相关学生" name="related-students" v-if="false">
+      <el-tab-pane label="相关学生" name="related-students">
         <!-- 相关学生 -->
-        <div class="section" v-if="responseData.data.related_data.related_students.length > 0">
-          <el-table
-            :data="responseData.data.related_data.related_students"
-            border
-            :max-height="500"
-          >
+        <div class="section" v-if="responseData.data.related_data.相关学生.length > 0">
+          <el-table :data="responseData.data.related_data.相关学生" border :max-height="500">
+            <!-- 固定第一列 (ID) -->
+            <el-table-column type="index" :min-width="50" fixed="left"> </el-table-column>
             <el-table-column
-              v-for="(value, key) in responseData.data.related_data.related_students[0]"
+              v-for="key in Object.keys(responseData.data.related_data.相关学生[0] || {}).filter(
+                (k) => k !== '序号',
+              )"
               :key="key"
               :prop="key"
               :label="key"
@@ -405,15 +412,15 @@ onMounted(() => {
         <div v-else>无相关学生</div>
       </el-tab-pane>
       <!-- 相关教职工 -->
-      <el-tab-pane label="相关教职工" name="related-teachers" v-if="false">
-        <div class="section" v-if="responseData.data.related_data.related_teachers.length > 0">
-          <el-table
-            :data="responseData.data.related_data.related_teachers"
-            border
-            :max-height="500"
-          >
+      <el-tab-pane label="相关教职工" name="related-teachers">
+        <div class="section" v-if="responseData.data.related_data.相关教职工.length > 0">
+          <el-table :data="responseData.data.related_data.相关教职工" border :max-height="500">
+            <!-- 固定第一列 (ID) -->
+            <el-table-column type="index" :min-width="50" fixed="left"> </el-table-column>
             <el-table-column
-              v-for="(value, key) in responseData.data.related_data.related_teachers[0]"
+              v-for="key in Object.keys(responseData.data.related_data.相关教职工[0] || {}).filter(
+                (k) => k !== '序号',
+              )"
               :key="key"
               :prop="key"
               :label="key"
@@ -424,15 +431,15 @@ onMounted(() => {
         <div v-else>无相关教职工</div>
       </el-tab-pane>
       <!-- 相关教职工 -->
-      <el-tab-pane label="相关教职工" name="related-projects" v-if="false">
-        <div class="section" v-if="responseData.data.related_data.related_projects.length > 0">
-          <el-table
-            :data="responseData.data.related_data.related_projects"
-            border
-            :max-height="500"
-          >
+      <el-tab-pane label="相关科研项目" name="related-projects">
+        <div class="section" v-if="responseData.data.related_data.相关科研项目.length > 0">
+          <el-table :data="responseData.data.related_data.相关科研项目" border :max-height="500">
+            <!-- 固定第一列 (ID) -->
+            <el-table-column type="index" :min-width="50" fixed="left"> </el-table-column>
             <el-table-column
-              v-for="(value, key) in responseData.data.related_data.related_projects[0]"
+              v-for="key in Object.keys(
+                responseData.data.related_data.相关科研项目[0] || {},
+              ).filter((k) => k !== '序号')"
               :key="key"
               :prop="key"
               :label="key"
@@ -440,7 +447,7 @@ onMounted(() => {
             </el-table-column>
           </el-table>
         </div>
-        <div v-else>无相关教职工</div>
+        <div v-else>无相关科研项目</div>
       </el-tab-pane>
     </el-tabs>
   </div>

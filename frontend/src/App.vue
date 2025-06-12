@@ -11,10 +11,11 @@ const navItems = [
 ]
 const roles = [
   { name: '管理员', value: 'Admin' },
-  { name: '老师', value: 'Teacher' },
+  { name: '教职工', value: 'Teacher' },
   { name: '学生', value: 'Student' },
 ]
 const loginDialogVisible = ref(false)
+const currentUser = ref()
 const account = ref({
   username: '',
   password: '',
@@ -29,6 +30,8 @@ async function handleLogin() {
   try {
     const response = await request.post('/auth/login', account.value)
     localStorage.setItem('jwt_token', response.data.data.token)
+    localStorage.setItem('current_user', account.value.username)
+    currentUser.value = account.value.username
     // LoggedIn.value = true
   } catch (error) {
     console.error('登录失败', error.message)
@@ -44,7 +47,9 @@ async function handleLogout() {
   try {
     // await request.post('/auth/logout')
     localStorage.removeItem('jwt_token')
+    localStorage.removeItem('current_user')
     isLoggedIn.value = false
+    currentUser.value = '游客'
     // LoggedIn.value = false
     ElMessage.success('注销成功')
   } catch (error) {
@@ -54,6 +59,7 @@ async function handleLogout() {
 }
 onMounted(() => {
   console.log(window.devicePixelRatio)
+  currentUser.value = ref(localStorage.getItem('current_user') || '游客')
 })
 </script>
 
@@ -108,6 +114,7 @@ onMounted(() => {
           <div class="logo-container">
             <img alt="Vue logo" class="logo" src="@/assets/logo.svg" />
             <h1 class="app-title">数据库操作平台</h1>
+            <h1 class="app-title">{{ currentUser }}</h1>
           </div>
           <div class="auth-button">
             <el-button
