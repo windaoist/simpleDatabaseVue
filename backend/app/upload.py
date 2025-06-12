@@ -268,6 +268,11 @@ def import_project_data(file):
                 member_ids = extract_ids(row.get('member', '').split('、'))
                 teacher_ids = extract_ids(row.get('teacher', '').split('、'))
 
+                # 检查负责人是否也在成员中
+                if leader_ids and any(leader_ids[0] == sid for sid in member_ids):
+                    duplicates.add(f"学生 {leader_ids[0]} 在项目 {project_id} 中既是负责人又是成员，冲突")
+                    continue
+
                 # 检查是否所有人存在于 Student/Teacher 表中
                 all_valid = True
 
