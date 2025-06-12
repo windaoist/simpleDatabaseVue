@@ -188,59 +188,69 @@ class AddData(Resource):
                 response_data['record'] = {'teacher_id': record_data['teacher_id']}
 
             elif table == 'project':
+                if role != 'Student':
+                    return api_response(False, '仅学生可添加科研项目信息', status=403)
+                
+                # 判断学生是否已是某项目负责人
+                cursor.execute("SELECT COUNT(*) FROM StudentProject WHERE student_id=%s AND role='负责人'", (user_id,))
+                if cursor.fetchone()[0] >= 1:
+                    return api_response(False, '您已作为负责人参与一个项目，不能再次创建', status=409)
+
                 required_fields = ['project_id', 'name', 'project_content']
                 if not all(field in record_data for field in required_fields):
                     return api_response(False, '缺少必要字段', status=400)
 
                 project_id = record_data['project_id']
-                cursor.execute("SELECT 1 FROM Project WHERE project_id=%s", (project_id, ))
+                cursor.execute("SELECT 1 FROM Project WHERE project_id=%s", (project_id,))
                 if cursor.fetchone():
                     return api_response(False, '项目已存在', {'type': 'duplicate'}, 409)
 
-                leader_ids = [s.strip() for s in record_data.get('负责人学号', '').split('、') if s.strip()]
+                # 当前用户就是负责人，不能传 leader 字段
+                student_leader_id = user_id
+
+                # 获取成员与教师 ID
                 member_ids = [s.strip() for s in record_data.get('成员学号', '').split('、') if s.strip()]
                 teacher_ids = [t.strip() for t in record_data.get('指导教师工号', '').split('、') if t.strip()]
 
-                # 禁止负责人也在成员中
-                if leader_ids and leader_ids[0] in member_ids:
+                # 负责人不能出现在成员中
+                if student_leader_id in member_ids:
                     return api_response(False, '负责人不能同时是成员', status=400)
 
-                # 校验人员是否存在
-                student_ids_to_check = leader_ids + member_ids
-                for sid in student_ids_to_check:
-                    cursor.execute("SELECT 1 FROM Student WHERE student_id=%s", (sid, ))
-                    if not cursor.fetchone():
-                        return api_response(False, f"学生学号不存在：{sid}", status=400)
-
-                for tid in teacher_ids:
-                    cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id=%s", (tid, ))
-                    if not cursor.fetchone():
-                        return api_response(False, f"教师工号不存在：{tid}", status=400)
-
-                # 数量限制
+                # 成员数量限制
                 if len(member_ids) > 4:
                     return api_response(False, '成员不能超过4人', status=400)
+
+                # 教师数量限制
                 if len(teacher_ids) > 2:
                     return api_response(False, '指导教师不能超过2人', status=400)
 
-                # 权限逻辑限制
-                if role == 'Student':
-                    cursor.execute("SELECT COUNT(*) FROM StudentProject WHERE student_id=%s AND role='负责人'", (user_id, ))
-                    if cursor.fetchone()[0] >= 1:
-                        return api_response(False, '您已作为负责人参与一个项目，不能再次创建', status=409)
+                # 校验成员学生是否存在
+                for sid in member_ids:
+                    cursor.execute("SELECT name FROM Student WHERE student_id=%s", (sid,))
+                    student_row = cursor.fetchone()
+                    if not student_row:
+                        return api_response(False, f"学生学号不存在：{sid}", status=400)
 
-                if role == 'Teacher':
-                    if user_id in teacher_ids:
-                        cursor.execute("SELECT COUNT(*) FROM TeacherProject WHERE teacher_id=%s", (user_id, ))
-                        if cursor.fetchone()[0] >= 2:
-                            return api_response(False, '您已作为指导教师参与两个项目，不能再参与更多', status=409)
+                # 校验教师是否存在
+                for tid in teacher_ids:
+                    cursor.execute("SELECT name FROM Teacher WHERE teacher_id=%s", (tid,))
+                    teacher_row = cursor.fetchone()
+                    if not teacher_row:
+                        return api_response(False, f"教师工号不存在：{tid}", status=400)
 
                 # 插入主表
                 cursor.execute(
                     "INSERT INTO Project (project_id, name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
                     "VALUES (%s, %s, %s, %s, %s, %s)",
-                    (project_id, record_data['name'], record_data['project_content'], record_data.get(
-                        'project_application_status', ''), record_data.get('project_approval_status', ''), record_data.get('project_acceptance_status', '')))
+                    (
+                        project_id,
+                        record_data['name'],
+                        record_data['project_content'],
+                        record_data.get('project_application_status', ''),
+                        record_data.get('project_approval_status', ''),
+                        record_data.get('project_acceptance_status', '')
+                    )
+                )
 
                 # 插入研究领域
                 field_str = record_data.get('research_field', '')
@@ -248,17 +258,37 @@ class AddData(Resource):
                 for fid in research_fields:
                     cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, research_field) VALUES (%s, %s)", (project_id, fid))
 
-                # 插入负责人
-                if leader_ids:
-                    cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (leader_ids[0], project_id))
+                # 插入负责人（当前用户）
+                cursor.execute("SELECT name FROM Student WHERE student_id=%s", (student_leader_id,))
+                student_row = cursor.fetchone()
+                if student_row:
+                    leader_display = f"{student_row['name']}（{student_leader_id}）"
+                    cursor.execute(
+                        "INSERT INTO StudentProject (student_id, project_id, role, display) VALUES (%s, %s, '负责人', %s)",
+                        (student_leader_id, project_id, leader_display)
+                    )
 
                 # 插入成员
                 for sid in member_ids:
-                    cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (sid, project_id))
+                    cursor.execute("SELECT name FROM Student WHERE student_id=%s", (sid,))
+                    name_row = cursor.fetchone()
+                    if name_row:
+                        display = f"{name_row['name']}（{sid}）"
+                        cursor.execute(
+                            "INSERT INTO StudentProject (student_id, project_id, role, display) VALUES (%s, %s, '成员', %s)",
+                            (sid, project_id, display)
+                        )
 
                 # 插入教师
                 for tid in teacher_ids:
-                    cursor.execute("INSERT INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (tid, project_id))
+                    cursor.execute("SELECT name FROM Teacher WHERE teacher_id=%s", (tid,))
+                    name_row = cursor.fetchone()
+                    if name_row:
+                        display = f"{name_row['name']}（{tid}）"
+                        cursor.execute(
+                            "INSERT INTO TeacherProject (teacher_id, project_id, display) VALUES (%s, %s, %s)",
+                            (tid, project_id, display)
+                        )
 
                 response_data['record'] = {'project_id': project_id}
 
