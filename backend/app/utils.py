@@ -144,27 +144,3 @@ def auth_required(roles=None):
         return wrapper
 
     return decorator
-
-
-def change_password(username, old_password, new_password):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT password FROM Users WHERE username=%s", (username, ))
-        row = cursor.fetchone()
-        if not row:
-            return {'success': False, 'message': '用户不存在'}
-
-        if row['password'] != old_password:
-            return {'success': False, 'message': '原密码错误'}
-
-        cursor.execute("UPDATE Users SET password=%s WHERE username=%s", (new_password, username))
-        conn.commit()
-        return {'success': True, 'message': '密码修改成功'}
-
-    except Exception as e:
-        conn.rollback()
-        return {'success': False, 'message': f'修改失败: {str(e)}'}
-    finally:
-        cursor.close()
-        conn.close()
