@@ -25,6 +25,9 @@ const conceptMap: Record<string, string> = {
   department: '所属专业',
   office_location: '办公地点',
   introduction: '个人简介',
+  head: '负责人',
+  members: '学生学号',
+  instructors: '指导教师工号',
 }
 
 // 构建英文 -> 中文 Map

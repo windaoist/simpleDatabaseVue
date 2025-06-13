@@ -365,9 +365,10 @@ onMounted(() => {
               v-for="key in editableColumns"
               :key="key"
               :label="key"
+              :prop="key"
               :min-width="key.length * 15 + 30"
             >
-              <template #default="{ row, $index }">
+              <!-- <template #default="{ row, $index }">
                 <template v-if="isEditing($index)">
                   <el-input
                     v-model="row[key]"
@@ -379,7 +380,7 @@ onMounted(() => {
                 <template v-else>
                   {{ row[key] }}
                 </template>
-              </template>
+              </template> -->
             </el-table-column>
 
             <!-- 固定操作列 -->
