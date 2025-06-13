@@ -388,6 +388,53 @@ class EditData(Resource):
                 response_data['record'] = {'teacher_id': new_key}
 
             elif table == 'project':
+                # 读取三项状态字段
+                cursor.execute(
+                    """
+                    SELECT project_application_status,
+                        project_approval_status,
+                        project_acceptance_status
+                    FROM Project
+                    WHERE project_id = %s
+                    """, (old_key, ))
+                row = cursor.fetchone()
+                if not row:
+                    return api_response(False, '项目不存在', status=400)
+
+                app_status = row['project_application_status']  # 未申报 / 申报通过
+                aprv_status = row['project_approval_status']  # 未审批 / 审批通过
+                accp_status = row['project_acceptance_status']  # 未验收 / 验收通过
+
+                # ----------- 验收通过 → 禁止任何人编辑 -----------
+                if accp_status == '验收通过':
+                    return api_response(False, '项目已验收通过，禁止编辑', status=403)
+
+                # ----------- 未申报 → 只有负责人(学生)可编辑 -----
+                if app_status == '未申报':
+                    if role != 'Student':
+                        return api_response(False, '仅负责人可编辑未申报项目', status=403)
+                    cursor.execute("SELECT 1 FROM StudentProject WHERE project_id=%s AND student_id=%s AND role='负责人'", (old_key, user_id))
+                    if not cursor.fetchone():
+                        return api_response(False, '您无权编辑该项目（不是负责人）', status=403)
+
+                # ----------- 申报通过 & 未审批 → 指导教师可编辑 ---
+                elif app_status == '申报通过' and aprv_status == '未审批':
+                    if role != 'Teacher':
+                        return api_response(False, '仅指导教师可编辑该项目', status=403)
+                    cursor.execute("SELECT 1 FROM TeacherProject WHERE project_id=%s AND teacher_id=%s", (old_key, user_id))
+                    if not cursor.fetchone():
+                        return api_response(False, '您无权编辑该项目（不是指导教师）', status=403)
+
+                # ----------- 审批通过 & 未验收 → 仅 Admin 可编辑 ---
+                elif aprv_status == '审批通过' and accp_status == '未验收':
+                    if role != 'Admin':
+                        return api_response(False, '仅管理员可编辑该项目', status=403)
+
+                # ----------- 任何其它组合（异常） → 默认仅 Admin -------
+                else:
+                    if role != 'Admin':
+                        return api_response(False, '当前状态禁止编辑', status=403)
+
                 new_key = record_data.get('project_id')
                 if new_key != old_key:
                     cursor.execute("SELECT 1 FROM Project WHERE project_id=%s", (new_key, ))
