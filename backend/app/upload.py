@@ -75,6 +75,7 @@ def import_student_data(file):
         # 清空旧数据
         cursor.execute("TRUNCATE TABLE StudentProject")
         cursor.execute("TRUNCATE TABLE StudentResearchField")
+        cursor.execute("DELETE FROM Users WHERE role='Student'")
         cursor.execute("TRUNCATE TABLE Student")
 
         for _, row in df.iterrows():
@@ -158,6 +159,7 @@ def import_teacher_data(file):
         # 清空旧数据
         cursor.execute("TRUNCATE TABLE TeacherProject")
         cursor.execute("TRUNCATE TABLE TeacherResearchField")
+        cursor.execute("DELETE FROM Users WHERE role='Teacher'")
         cursor.execute("TRUNCATE TABLE Teacher")
 
         for _, row in df.iterrows():
