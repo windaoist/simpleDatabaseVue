@@ -156,7 +156,8 @@ class AddData(Resource):
                                            (record_data['student_id'], row['id']))
 
                 # 添加用户记录（默认密码为学号）
-                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Student')", (record_data['student_id'], record_data['student_id']))
+                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Student')",
+                               (record_data['student_id'], record_data['student_id']))
 
                 response_data['record'] = {'student_id': record_data['student_id']}
 
@@ -193,7 +194,8 @@ class AddData(Resource):
                                            (record_data['teacher_id'], row['id']))
 
                 # 添加用户记录（默认密码为工号）
-                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Teacher')", (record_data['teacher_id'], record_data['teacher_id']))
+                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Teacher')",
+                               (record_data['teacher_id'], record_data['teacher_id']))
 
                 response_data['record'] = {'teacher_id': record_data['teacher_id']}
 
@@ -251,9 +253,9 @@ class AddData(Resource):
 
                 # 插入主表
                 cursor.execute(
-                    "INSERT INTO Project (project_id, name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
+                    "INSERT INTO Project (project_id, project_name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
                     "VALUES (%s, %s, %s, %s, %s, %s)",
-                    (project_id, record_data['name'], record_data['project_content'], record_data.get(
+                    (project_id, record_data['project_name'], record_data['project_content'], record_data.get(
                         'project_application_status', ''), record_data.get('project_approval_status', ''), record_data.get('project_acceptance_status', '')))
 
                 # 插入研究领域
@@ -266,26 +268,21 @@ class AddData(Resource):
                 cursor.execute("SELECT name FROM Student WHERE student_id=%s", (student_leader_id, ))
                 student_row = cursor.fetchone()
                 if student_row:
-                    leader_display = f"{student_row['name']}（{student_leader_id}）"
-                    cursor.execute("INSERT INTO StudentProject (student_id, project_id, role, display) VALUES (%s, %s, '负责人', %s)",
-                                   (student_leader_id, project_id, leader_display))
+                    cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (student_leader_id, project_id))
 
                 # 插入成员
                 for sid in member_ids:
                     cursor.execute("SELECT name FROM Student WHERE student_id=%s", (sid, ))
                     name_row = cursor.fetchone()
                     if name_row:
-                        display = f"{name_row['name']}（{sid}）"
-                        cursor.execute("INSERT INTO StudentProject (student_id, project_id, role, display) VALUES (%s, %s, '成员', %s)",
-                                       (sid, project_id, display))
+                        cursor.execute("INSERT INTO StudentProject (student_id, project_id, role, display) VALUES (%s, %s, '成员')", (sid, project_id))
 
                 # 插入教师
                 for tid in teacher_ids:
                     cursor.execute("SELECT name FROM Teacher WHERE teacher_id=%s", (tid, ))
                     name_row = cursor.fetchone()
                     if name_row:
-                        display = f"{name_row['name']}（{tid}）"
-                        cursor.execute("INSERT INTO TeacherProject (teacher_id, project_id, display) VALUES (%s, %s, %s)", (tid, project_id, display))
+                        cursor.execute("INSERT INTO TeacherProject (teacher_id, project_id, display) VALUES (%s, %s)", (tid, project_id))
 
                 response_data['record'] = {'project_id': project_id}
 
@@ -536,8 +533,6 @@ class DeleteData(Resource):
                 cursor.execute("DELETE FROM StudentProject WHERE student_id=%s", (key, ))
                 cursor.execute("DELETE FROM StudentResearchField WHERE student_id=%s", (key, ))
                 cursor.execute("DELETE FROM Student WHERE student_id=%s", (key, ))
-
-                
 
             elif table == 'teacher':
                 if role != 'Admin':
