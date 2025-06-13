@@ -1,67 +1,43 @@
+<!-- eslint-disable @typescript-eslint/no-explicit-any -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import request from '@/utils/request'
-import * as translate from '@/stores/LanguageConverter'
 import { ElMessage } from 'element-plus'
-import { getAttribute } from '@/stores/TableStructure'
-const currentTable = ref('student')
-const fields = ref([])
-const primaryKey = ref()
-const formData = ref({
-  table: '',
-  filters: {},
-  research_field: [],
-})
-const research_fields = ref([])
-// const secondFieldKey = ref('')
-async function onQuery() {
-  try {
-    if (!currentTable.value) {
-      ElMessage.error('请选择查询表名')
-      return
-    }
-    // 获取表结构
-    const attributes = await getAttribute(currentTable.value)
-    fields.value = attributes
-    primaryKey.value = fields.value[0]
-    // secondFieldKey.value = attributes[1] || ''
-    console.log('表结构:', fields.value)
-  } catch (error) {
-    ElMessage.error('获取表格式失败，' + error.message)
-  }
-}
-async function handleSubmit() {
-  const payload = {
-    table: currentTable.value,
-    key: primaryKey.value,
-    data: {
-      ...formData.value.filters,
-    },
-  }
+import request from '@/utils/request'
+import AddForm from '@/components/AddForm.vue'
 
-  console.log('提交数据:', payload)
+const currentTable = ref('student' as 'student' | 'teacher' | 'project_submit' | '')
+const research_fields = ref([])
+async function handleSubmit(formData: { filters: any; memberList: any }) {
   try {
-    const response = await request.post('add-edit/add', payload, {
-      headers: {
-        Accept: '*/*',
-        'Content-Type': 'application/json',
+    const payload = {
+      table: currentTable.value == 'project_submit' ? 'project' : currentTable.value,
+      data: {
+        ...formData.filters,
+        research_field: formData.filters.research_field
+          ? formData.filters.research_field
+              .map((name) => {
+                const match = research_fields.value.find((field) => field.research_field === name)
+                return match ? match.id : null
+              })
+              .filter((id) => id !== null)
+          : null,
       },
-    })
-    if (response.data.success) {
-      ElMessage.success(response.data.message)
-      // 清空表单数据
-      fields.value = []
-      formData.value = {
-        table: '',
-        filters: {},
-        research_field: [],
-      }
-    } else {
-      ElMessage.error(response.data.message)
     }
+    if (Array.isArray(payload.data.research_field)) {
+      payload.data.research_field = payload.data.research_field.join('、')
+    }
+    if (currentTable.value == 'project_submit') {
+      payload.data['member_ids'] = formData.memberList.members
+        .flatMap((member) => Object.keys(member))
+        .join('、')
+      payload.data['teacher_ids'] = formData.memberList.instructors
+        .flatMap((member) => Object.keys(member))
+        .join('、')
+    }
+    const response = await request.post('add-edit/add', payload)
+    ElMessage.success('添加成功：' + response.data.message)
   } catch (error) {
-    console.error('提交数据失败:', error)
-    ElMessage.error('提交数据失败，' + error.message)
+    ElMessage.error('添加失败：' + error.response?.data?.message)
   }
 }
 async function fetchFields() {
@@ -76,81 +52,23 @@ async function fetchFields() {
 onMounted(() => {
   // 初始化行业列表
   fetchFields()
-  onQuery() // 默认查询专家表
 })
 </script>
 <template>
   <div>
     <div class="query-view">
       <h3>选择要添加项的表</h3>
-      <el-select
-        v-model="currentTable"
-        @change="onQuery()"
-        placeholder="请选择添加表表名"
-        style="width: 220px"
-      >
+      <el-select v-model="currentTable" placeholder="请选择添加表表名" style="width: 220px">
         <el-option label="学生表" value="student" />
         <el-option label="教职工表" value="teacher" />
-        <el-option label="科研项目表" value="project" />
+        <el-option label="科研项目表" value="project_submit" />
       </el-select>
-      <!-- <el-button type="primary" @click="onQuery" style="margin-left: 10px;">
-  查询
-</el-button> -->
     </div>
-    <div class="add-form" v-if="fields.length > 0">
-      <el-form :model="formData" label-width="120px" ref="formRef">
-        <div class="form-grid">
-          <el-form-item
-            v-for="field in fields"
-            :key="field"
-            :label="translate.translateToChinese(field)"
-          >
-            <!-- 第二项为下拉框 -->
-            <!-- <el-select
-              v-if="index === 1"
-              v-model="formData[field]"
-              placeholder="请选择"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="industry in industries"
-                :key="industry.id"
-                :label="industry.industry_name"
-                :value="industry.industry_name"
-              ></el-option>
-            </el-select> -->
-
-            <!-- 其他项为文本域 -->
-            <el-select
-              v-if="field === 'research_field'"
-              v-model="formData.research_field"
-              multiple
-              collapse-tags
-              placeholder="请选择研究领域"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="field in research_fields"
-                :key="field.id"
-                :label="field.research_field"
-                :value="field.research_field"
-              />
-            </el-select>
-            <el-input
-              v-else
-              type="textarea"
-              :autosize="true"
-              style="width: 100%"
-              v-model="formData[field]"
-            />
-          </el-form-item>
-
-          <el-form-item>
-            <el-button type="primary" @click="handleSubmit">提交</el-button>
-          </el-form-item>
-        </div>
-      </el-form>
-    </div>
+    <AddForm
+      :current-table="currentTable"
+      :research-fields="research_fields"
+      @submit="handleSubmit"
+    />
   </div>
 </template>
 <style scoped>
@@ -168,20 +86,68 @@ onMounted(() => {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   color: black;
 }
-
-.form-grid {
+/* 输入行样式 */
+.input-row {
   display: flex;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  max-width: 1200px;
-  margin: 10px auto;
-  padding: 0 10px;
-  gap: 10px; /* 添加间距 */
+  margin-bottom: 10px; /* 与下方标签保持间距 */
 }
 
-.el-form-item {
-  flex: 1 1 calc(50% - 16px);
-  box-sizing: border-box;
+.input-item {
+  flex: 1; /* 输入框占据剩余空间 */
+  margin-right: 10px; /* 输入框和按钮间距 */
+}
+/* .add-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
+} */
+/* 标签容器样式 */
+.tags-container {
+  display: flex;
+  flex-wrap: wrap; /* 允许标签换行 */
+  gap: 8px; /* 标签间距 */
+}
+
+/* 单个标签样式 */
+.tag-item {
+  margin-bottom: 5px; /* 标签行间距 */
+}
+.form-area {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 双列布局 */
+  gap: 20px 30px; /* 行间距20px，列间距30px */
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 0 15px;
+  align-items: start; /* 内容顶部对齐 */
+}
+.submit-btn {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+/* .el-form-item {
+  box-sizing: border-box;
+} */
+
+/* 单列项目 */
+.el-form-item.full-width {
+  grid-column: span 2;
+}
+
+/* 响应式：小屏幕单列显示 */
+@media (max-width: 768px) {
+  .form-area {
+    grid-template-columns: 1fr;
+  }
+  .el-form-item.full-width {
+    grid-column: span 1;
+  }
+}
+
+/* 确保标签和输入区关系 */
+.el-form-item__label {
+  padding-bottom: 8px !important;
+  height: auto !important;
 }
 </style>

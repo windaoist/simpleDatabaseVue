@@ -232,7 +232,7 @@ export const tableSchemas = {
       label: '项目编号',
       type: 'text',
       rules: [
-        { required: false, message: '项目ID不能为空' },
+        { required: true, message: '项目ID不能为空' },
         { pattern: /^P\d{8}$/, message: '格式应为P+8位数字' },
       ],
       primaryKey: true,
@@ -241,7 +241,7 @@ export const tableSchemas = {
       name: 'project_name',
       label: '项目名称',
       type: 'text',
-      rules: [{ required: false, message: '项目名称不能为空' }],
+      rules: [{ required: true, message: '项目名称不能为空' }],
     },
     {
       name: 'research_field',
@@ -261,19 +261,19 @@ export const tableSchemas = {
     {
       name: 'head',
       label: '负责人',
-      type: 'text',
+      type: 'fixed-user',
       rules: [{ required: false, message: '负责人不能为空' }],
     },
     {
       name: 'members',
       label: '成员',
-      type: 'member',
+      type: 'member-select',
       rules: [{ required: false, message: '能为空' }],
     },
     {
       name: 'instructors',
       label: '指导教师',
-      type: 'member',
+      type: 'member-select',
       rules: [{ required: false, message: '能为空' }],
     },
   ],
