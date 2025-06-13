@@ -214,8 +214,8 @@ class AddData(Resource):
                 student_leader_id = user_id
 
                 # 获取成员与教师 ID
-                member_ids = [s.strip() for s in record_data.get('成员学号', '').split('、') if s.strip()]
-                teacher_ids = [t.strip() for t in record_data.get('指导教师工号', '').split('、') if t.strip()]
+                member_ids = [s.strip() for s in record_data.get('member_ids', '').split('、') if s.strip()]
+                teacher_ids = [t.strip() for t in record_data.get('teacher_ids', '').split('、') if t.strip()]
 
                 # 负责人不能出现在成员中
                 if student_leader_id in member_ids:
