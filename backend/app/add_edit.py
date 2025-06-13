@@ -198,7 +198,7 @@ class AddData(Resource):
                 # 判断学生是否已是某项目负责人
                 cursor.execute("SELECT COUNT(*) FROM StudentProject WHERE student_id=%s AND role='负责人'", (user_id, ))
                 count = cursor.fetchone()
-                if count[0] >= 1:
+                if count['COUNT(*)'] >= 1:
                     return api_response(False, '您已作为负责人参与一个项目，不能再次创建', status=409)
 
                 required_fields = ['project_id', 'name']
