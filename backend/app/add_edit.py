@@ -155,6 +155,9 @@ class AddData(Resource):
                             cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, research_field) VALUES (%s, %s)",
                                            (record_data['student_id'], row['id']))
 
+                # 添加用户记录（默认密码为学号）
+                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Student')", (record_data['student_id'], record_data['student_id']))
+
                 response_data['record'] = {'student_id': record_data['student_id']}
 
             elif table == 'teacher':
@@ -189,6 +192,9 @@ class AddData(Resource):
                             cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, research_field) VALUES (%s, %s)",
                                            (record_data['teacher_id'], row['id']))
 
+                # 添加用户记录（默认密码为工号）
+                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Teacher')", (record_data['teacher_id'], record_data['teacher_id']))
+
                 response_data['record'] = {'teacher_id': record_data['teacher_id']}
 
             elif table == 'project':
@@ -201,7 +207,7 @@ class AddData(Resource):
                 if count['COUNT(*)'] >= 1:
                     return api_response(False, '您已作为负责人参与一个项目，不能再次创建', status=409)
 
-                required_fields = ['project_id', 'name']
+                required_fields = ['project_id', 'project_name']
                 if not all(record_data.get(field) and str(record_data.get(field)).strip() for field in required_fields):
                     return api_response(False, '存在必要字段为空', status=400)
 
@@ -530,6 +536,8 @@ class DeleteData(Resource):
                 cursor.execute("DELETE FROM StudentProject WHERE student_id=%s", (key, ))
                 cursor.execute("DELETE FROM StudentResearchField WHERE student_id=%s", (key, ))
                 cursor.execute("DELETE FROM Student WHERE student_id=%s", (key, ))
+
+                
 
             elif table == 'teacher':
                 if role != 'Admin':
