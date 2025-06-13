@@ -1,49 +1,64 @@
+<!-- eslint-disable @typescript-eslint/no-explicit-any -->
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import * as translate from '@/stores/LanguageConverter'
-import { getAttribute } from '@/stores/TableStructure'
+import { getTableSchema, getPrimaryKey } from '@/stores/TableStructure'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const queryForm = ref({
-  table: '',
-  filters: {},
-  research_field: [],
+  table: '' as 'student' | 'teacher' | 'project' | '',
+  filters: {} as Record<string, any>,
+  // 移除了单独的 research_field，现在它包含在 filters 中
 })
-const fields = ref([])
-// const secondFieldKey = ref('')
-// const formData = ref({
-//   table: '',
-//   filters: {},
-//   research_field: [],
-// })
-const research_fields = ref()
-const currentForm = ref()
-// const editingState = reactive({});
-// const editedData = ref([]);
+
+// 表结构字段
+const fields = ref<
+  Array<{
+    name: string
+    label: string
+    type: string
+    options?: Array<any>
+    valueKey?: string
+    labelKey?: string
+  }>
+>([])
+
+const research_fields = ref<Array<{ id: number; research_field: string }>>([])
+// const currentForm = ref('')
 const responseData = ref({
   data: {
-    results: [],
+    results: [] as any[],
     related_data: {
-      相关学生: [],
-      相关教职工: [],
-      相关科研项目: [],
+      相关学生: [] as any[],
+      相关教职工: [] as any[],
+      相关科研项目: [] as any[],
     },
   },
 })
 const activeName = ref()
-// 新增：用于存储原始列顺序
-// const columnOrder = ref([])
 const primaryKey = ref()
+
+// 当表名改变时获取表结构
 async function onTableChange() {
   try {
     if (!queryForm.value.table) {
       ElMessage.error('请选择查询表名')
       return
     }
+
     // 获取表结构
-    const attributes = await getAttribute(queryForm.value.table)
-    fields.value = attributes
+    const rawFields = getTableSchema(queryForm.value.table)
+    // 如果 options 是 Ref，则取其 value，否则保持原样
+    fields.value = rawFields.map((field) => {
+      if (field.options && typeof field.options === 'object' && 'value' in field.options) {
+        return { ...field, options: field.options.value }
+      }
+      return field
+    })
+
+    // 重置查询条件和结果
+    queryForm.value.filters = {}
     responseData.value = {
       data: {
         results: [],
@@ -54,10 +69,13 @@ async function onTableChange() {
         },
       },
     }
-    // secondFieldKey.value = attributes[1] || ''
+
+    // 获取主键
+    primaryKey.value = getPrimaryKey(queryForm.value.table) || ''
+
     console.log('表结构:', fields.value)
   } catch (error) {
-    ElMessage.error('获取表格式失败，' + error.message)
+    ElMessage.error('获取表格式失败: ' + (error as Error).message)
   }
 }
 const onQuerySubmit = async () => {
@@ -66,51 +84,54 @@ const onQuerySubmit = async () => {
       ElMessage.error('请选择查询表名')
       return
     }
-    console.log('research_field value:', queryForm.value.research_field)
+
+    // 准备查询参数
     const payload = {
       table: queryForm.value.table,
-      filters: queryForm.value.filters,
-      research_field: queryForm.value.research_field
-        .map((name) => {
-          const match = research_fields.value.find((field) => field.research_field === name)
-          return match ? match.id : null
-        })
-        .filter((id) => id !== null), // 过滤掉找不到的
+      filters: {} as Record<string, any>,
+      research_field: queryForm.value.filters.research_field
+        ? queryForm.value.filters.research_field
+            .map((name) => {
+              const match = research_fields.value.find((field) => field.research_field === name)
+              return match ? match.id : null
+            })
+            .filter((id) => id !== null)
+        : null, // 过滤掉找不到的
     }
-    const response = await request.post('query/', payload)
 
+    // 处理过滤器参数 - 只包含有值的字段
+    Object.keys(queryForm.value.filters).forEach((key) => {
+      const value = queryForm.value.filters[key]
+      if (value !== '' && value !== null && value !== undefined) {
+        // 如果是数组且为空，则不添加
+        if ((Array.isArray(value) && value.length === 0) || key == 'research_field') return
+
+        payload.filters[key] = value
+      }
+    })
+
+    const response = await request.post('query/', payload)
     responseData.value = response.data
-    console.log(responseData.value.data)
-    currentForm.value = queryForm.value.table // 保存当前查询表单数据
-    // 获取除“序号”外的所有列名
-    // const firstRow = responseData.value.data.results[0]
-    // const keys = Object.keys(firstRow).filter((k) => k !== '序号')
-    // columnOrder.value = keys
-    // // 为每一行添加 __colOrder 字段
-    const results = responseData.value.data.results
-    if (results.length > 0) {
-      // 取第一项的第一个键
-      const firstItem = results[0]
-      const firstKey = Object.keys(firstItem)[0]
-      primaryKey.value = firstKey
-      console.log('当前主键字段名:', firstKey)
+
+    if (responseData.value.data.results.length > 0) {
       activeName.value = 'query-result' // 切换到查询结果标签
-      console.log('查询结果:', responseData.value)
     }
   } catch (error) {
     console.error('查询失败:', error)
-    ElMessage.error('查询失败：' + error.response?.data?.message)
+    ElMessage.error(
+      '查询失败：' + ((error as any).response?.data?.message || (error as Error).message),
+    )
   }
 }
+
 // 编辑状态
 const editingId = ref(null)
 const originalData = ref()
 // 计算可编辑列（排除ID列），返回列名数组
 const editableColumns = computed(() => {
   if (!responseData.value.data.results.length) return []
-  // 优先用 columnOrder
   return fields.value.length
-    ? Object.values(fields.value).map((key) => translate.translateToChinese(key))
+    ? fields.value.map((item) => item.label)
     : Object.keys(responseData.value.data.results[0]).filter((k) => k !== '序号')
 })
 
@@ -140,7 +161,7 @@ const handleSubmit = async (row) => {
     console.log('提交数据:', row)
     const primary = row[primaryKey.value]
     const payload = {
-      table: currentForm.value,
+      table: queryForm.value.table,
       old_key: primary,
       data: {
         ...Object.fromEntries(
@@ -178,21 +199,16 @@ async function handleDelete(row) {
         console.log('用户取消删除')
         throw '取消' // 抛出异常以跳过后续操作
       })
-    const primary = row[primaryKey.value]
+    const primary = row[translate.translateToChinese(primaryKey.value)]
     const payload = {
-      table: currentForm.value,
+      table: queryForm.value.table,
       key: primary,
     }
-    const response = request.post('add-edit/delete', payload)
-    ElMessage.success('删除成功：' + (await response).data.message)
-    // const colOrder = row.__colOrder
-    // const keys = {}
-    // if (colOrder && colOrder.length >= 2) {
-    //   const [firstKey, secondKey] = colOrder.slice(0, 2)
-    //   keys[0] = row[firstKey]
-    //   keys[1] = row[secondKey]
-
-    // 构造 payload
+    const response = await request.post('add-edit/delete', payload)
+    responseData.value.data.results = responseData.value.data.results.filter(
+      (item) => item[translate.translateToChinese(primaryKey.value)] !== primary,
+    )
+    ElMessage.success((await response).data.message)
   } catch (error) {
     ElMessage.error('删除失败：' + error.response?.data?.message)
   }
@@ -220,25 +236,6 @@ async function onDownload() {
     ElMessage.error('导出失败:' + error.message)
   }
 }
-// const editingRow = ref()
-// const editingContent = ref('')
-// const contentDialogVisible = ref(false)
-// function openContentDialog(row) {
-//   editingRow.value = row
-//   editingContent.value = row['教职工内容'] || ''
-//   contentDialogVisible.value = true
-// }
-
-// function handleDialogSave() {
-//   if (editingRow.value) {
-//     editingRow.value['教职工内容'] = editingContent.value
-//   }
-//   contentDialogVisible.value = false
-// }
-
-// function handleDialogClose() {
-//   contentDialogVisible.value = false
-// }
 
 async function fetchFields() {
   try {
@@ -261,11 +258,11 @@ onMounted(() => {
 <template>
   <div>
     <div class="query-view">
-      <el-form :inline="true" label-position="left" label-width="80px" :model="queryForm">
+      <el-form :inline="true" label-position="left" label-width="100px" :model="queryForm">
         <el-form-item label="查询表名">
           <el-select
             v-model="queryForm.table"
-            @change="onTableChange()"
+            @change="onTableChange"
             placeholder="请选择查询表名"
             style="width: 220px"
           >
@@ -274,73 +271,88 @@ onMounted(() => {
             <el-option label="科研项目表" value="project" />
           </el-select>
         </el-form-item>
+
         <div class="query-form-items">
           <el-form-item
             v-for="field in fields"
-            :key="field"
-            :label="translate.translateToChinese(field)"
-            style="flex: 1; min-width: 200px"
+            :key="field.name"
+            :label="field.label"
+            style="flex: 1; min-width: 250px; margin-bottom: 20px"
           >
-            <!-- 特殊处理“研究领域”为下拉框 -->
+            <!-- 研究领域字段 - 多选下拉 -->
             <el-select
-              v-if="field === 'research_field'"
-              v-model="queryForm.research_field"
+              v-if="field.name === 'research_field'"
+              v-model="queryForm.filters[field.name]"
               multiple
               collapse-tags
               placeholder="请选择研究领域"
               style="width: 100%"
             >
               <el-option
-                v-for="field in research_fields"
-                :key="field.id"
-                :label="field.research_field"
-                :value="field.research_field"
+                v-for="item in research_fields"
+                :key="item.id"
+                :label="item.research_field"
+                :value="item.research_field"
               />
             </el-select>
 
-            <!-- 默认使用文本域 -->
+            <!-- 状态字段 - 下拉选择 -->
+            <el-select
+              v-else-if="field.name.includes('_status')"
+              v-model="queryForm.filters[field.name]"
+              placeholder="请选择状态"
+              clearable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="option in field.options"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+
+            <!-- 性别字段 - 下拉选择 -->
+            <el-select
+              v-else-if="field.name === 'gender'"
+              v-model="queryForm.filters[field.name]"
+              placeholder="请选择性别"
+              clearable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="option in field.options"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+
+            <!-- 其他字段 - 文本输入 -->
             <el-input
               v-else
-              type="textarea"
-              :autosize="{ minRows: 1, maxRows: 6 }"
-              v-model="queryForm.filters[field]"
-              style="width: 80%"
+              v-model="queryForm.filters[field.name]"
+              :placeholder="`请输入${field.label}`"
+              clearable
+              style="width: 100%"
             />
           </el-form-item>
         </div>
-        <el-form-item>
+
+        <el-form-item style="margin-top: 20px">
           <el-button type="primary" @click="onQuerySubmit" class="submit-btn">查询</el-button>
           <el-button
             type="success"
             @click="onDownload"
-            :disabled="!responseData.data"
+            :disabled="!responseData.data.results || responseData.data.results.length === 0"
             class="download-btn"
-            >导出</el-button
           >
+            导出
+          </el-button>
         </el-form-item>
       </el-form>
     </div>
-    <!-- <div>
-   <p>{{responseData}}</p>
-</div> -->
-    <!-- <el-dialog
-      v-model="contentDialogVisible"
-      title="编辑教职工内容"
-      width="60%"
-      :before-close="handleDialogClose"
-    >
-      <el-input
-        type="textarea"
-        v-model="editingContent"
-        :rows="10"
-        placeholder="请输入教职工内容"
-        style="width: 100%"
-      />
-      <template #footer>
-        <el-button @click="handleDialogClose">取消</el-button>
-        <el-button type="primary" @click="handleDialogSave">保存</el-button>
-      </template>
-    </el-dialog> -->
+
     <el-tabs class="query-result" v-model="activeName" v-if="responseData.data">
       <el-tab-pane label="查询结果" name="query-result">
         <div class="section" v-if="responseData.data.results.length > 0">
