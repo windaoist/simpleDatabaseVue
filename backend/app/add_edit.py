@@ -192,8 +192,8 @@ class AddData(Resource):
                 response_data['record'] = {'teacher_id': record_data['teacher_id']}
 
             elif table == 'project':
-                # if role != 'Student':
-                #     return api_response(False, '仅学生可添加科研项目信息', status=403)
+                if role != 'Student':
+                    return api_response(False, '仅学生可添加科研项目信息', status=403)
 
                 # 判断学生是否已是某项目负责人
                 cursor.execute("SELECT COUNT(*) FROM StudentProject WHERE student_id=%s AND role='负责人'", (user_id, ))
