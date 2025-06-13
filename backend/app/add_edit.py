@@ -252,11 +252,8 @@ class AddData(Resource):
                         return api_response(False, f"教师工号不存在：{tid}", status=400)
 
                 # 插入主表
-                cursor.execute(
-                    "INSERT INTO Project (project_id, project_name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
-                    "VALUES (%s, %s, %s, %s, %s, %s)",
-                    (project_id, record_data['project_name'], record_data['project_content'], record_data.get(
-                        'project_application_status', ''), record_data.get('project_approval_status', ''), record_data.get('project_acceptance_status', '')))
+                cursor.execute("INSERT INTO Project (project_id, project_name, project_content) "
+                               "VALUES (%s, %s, %s)", (project_id, record_data['project_name'], record_data['project_content']))
 
                 # 插入研究领域
                 field_str = record_data.get('research_field', '')
