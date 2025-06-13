@@ -275,14 +275,14 @@ class AddData(Resource):
                     cursor.execute("SELECT name FROM Student WHERE student_id=%s", (sid, ))
                     name_row = cursor.fetchone()
                     if name_row:
-                        cursor.execute("INSERT INTO StudentProject (student_id, project_id, role, display) VALUES (%s, %s, '成员')", (sid, project_id))
+                        cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (sid, project_id))
 
                 # 插入教师
                 for tid in teacher_ids:
                     cursor.execute("SELECT name FROM Teacher WHERE teacher_id=%s", (tid, ))
                     name_row = cursor.fetchone()
                     if name_row:
-                        cursor.execute("INSERT INTO TeacherProject (teacher_id, project_id, display) VALUES (%s, %s)", (tid, project_id))
+                        cursor.execute("INSERT INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (tid, project_id))
 
                 response_data['record'] = {'project_id': project_id}
 
