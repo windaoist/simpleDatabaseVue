@@ -67,7 +67,7 @@ class ValidateID(Resource):
 
     @ns.doc(params={'type': 'student/teacher', 'id': '输入的学号或工号'})
     def get(self):
-        """校验输入的学号/工号是否存在"""
+        """校验输入的学号/工号是否存在，并返回姓名"""
         id_type = request.args.get('type')
         person_id = request.args.get('id')
 
@@ -76,13 +76,15 @@ class ValidateID(Resource):
 
         table = 'Student' if id_type == 'student' else 'Teacher'
         id_field = 'student_id' if id_type == 'student' else 'teacher_id'
+        name_field = 'name'
 
         connection = get_db_connection()
         cursor = connection.cursor()
         try:
-            cursor.execute(f"SELECT 1 FROM {table} WHERE {id_field} = %s", (person_id, ))
-            if cursor.fetchone():
-                return api_response(True, f"{id_type} 存在", {'valid': True})
+            cursor.execute(f"SELECT {name_field} FROM {table} WHERE {id_field} = %s", (person_id, ))
+            row = cursor.fetchone()
+            if row:
+                return api_response(True, f"{id_type} 存在", {'valid': True, f'{id_type}_name': row[name_field]})
             else:
                 return api_response(True, f"{id_type} 不存在", {'valid': False})
         finally:
