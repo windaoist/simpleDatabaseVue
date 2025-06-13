@@ -534,6 +534,9 @@ class DeleteData(Resource):
                 cursor.execute("DELETE FROM StudentResearchField WHERE student_id=%s", (key, ))
                 cursor.execute("DELETE FROM Student WHERE student_id=%s", (key, ))
 
+                # 同时删除 Users 表中对应记录
+                cursor.execute("DELETE FROM Users WHERE username=%s AND role='Student'", (key, ))
+
             elif table == 'teacher':
                 if role != 'Admin':
                     return api_response(False, '仅管理员可删除教师信息', status=403)
@@ -542,6 +545,9 @@ class DeleteData(Resource):
                 cursor.execute("DELETE FROM TeacherProject WHERE teacher_id=%s", (key, ))
                 cursor.execute("DELETE FROM TeacherResearchField WHERE teacher_id=%s", (key, ))
                 cursor.execute("DELETE FROM Teacher WHERE teacher_id=%s", (key, ))
+
+                # 同时删除 Users 表中对应记录
+                cursor.execute("DELETE FROM Users WHERE username=%s AND role='Teacher'", (key, ))
 
             else:
                 return api_response(False, '不支持的表名', status=400)
