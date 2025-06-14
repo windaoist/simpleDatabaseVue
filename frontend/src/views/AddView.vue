@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
 import AddForm from '@/components/AddForm.vue'
 
-const currentTable = ref('student' as 'student' | 'teacher' | 'project_submit' | '')
+const currentTable = ref('student' as 'student' | 'teacher' | 'project_submit' | 'project' | '')
 const research_fields = ref([])
 async function handleSubmit(formData: { filters: any; memberList: any }) {
   try {
@@ -27,10 +27,10 @@ async function handleSubmit(formData: { filters: any; memberList: any }) {
       payload.data.research_field = payload.data.research_field.join('、')
     }
     if (currentTable.value == 'project_submit') {
-      payload.data['member_ids'] = formData.memberList.members
+      payload.data['member'] = formData.memberList.member
         .flatMap((member) => Object.keys(member))
         .join('、')
-      payload.data['teacher_ids'] = formData.memberList.instructors
+      payload.data['teacher'] = formData.memberList.teacher
         .flatMap((member) => Object.keys(member))
         .join('、')
     }

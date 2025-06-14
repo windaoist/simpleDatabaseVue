@@ -196,6 +196,24 @@ export const tableSchemas = {
       rules: [{ required: false, message: '项目内容不能为空' }],
     },
     {
+      name: 'leader',
+      label: '负责人',
+      type: 'fixed-user',
+      rules: [{ required: false, message: '负责人不能为空' }],
+    },
+    {
+      name: 'member',
+      label: '成员',
+      type: 'member-select',
+      rules: [{ required: false, message: '能为空' }],
+    },
+    {
+      name: 'teacher',
+      label: '指导教师',
+      type: 'member-select',
+      rules: [{ required: false, message: '能为空' }],
+    },
+    {
       name: 'project_application_status',
       label: '申报状态',
       type: 'select',
@@ -259,19 +277,19 @@ export const tableSchemas = {
       rules: [{ required: false, message: '项目内容不能为空' }],
     },
     {
-      name: 'head',
+      name: 'leader',
       label: '负责人',
       type: 'fixed-user',
       rules: [{ required: false, message: '负责人不能为空' }],
     },
     {
-      name: 'members',
+      name: 'member',
       label: '成员',
       type: 'member-select',
       rules: [{ required: false, message: '能为空' }],
     },
     {
-      name: 'instructors',
+      name: 'teacher',
       label: '指导教师',
       type: 'member-select',
       rules: [{ required: false, message: '能为空' }],
@@ -288,4 +306,10 @@ export function getPrimaryKey(tableName: 'student' | 'teacher' | 'project' | 'pr
   const schema = tableSchemas[tableName]
   const primaryKeyField = schema.find((field) => field.primaryKey)
   return primaryKeyField ? primaryKeyField.name : null
+}
+// 获取主键字段
+export function getPrimaryLabel(tableName: 'student' | 'teacher' | 'project' | 'project_submit') {
+  const schema = tableSchemas[tableName]
+  const primaryKeyField = schema.find((field) => field.primaryKey)
+  return primaryKeyField ? primaryKeyField.label : null
 }
