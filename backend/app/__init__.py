@@ -1,45 +1,76 @@
-from flask import Flask
-from flask_restx import Api
-from flask_cors import CORS
 import os
+import uuid
+import pandas as pd
+from flask import Blueprint, current_app, request, send_from_directory, url_for
+from flask_restx import Resource, fields, Namespace
+from openpyxl import Workbook
+from datetime import datetime
+from app.utils import auth_required
+
+# Blueprint 和 Namespace 保持一致
+export_bp = Blueprint('export_bp', __name__)
+ns = Namespace('export', description='数据导出接口')
+
+# 定义模型
+export_input = ns.model('ExportInput', {'data': fields.List(fields.Raw, required=True, description='待导出的数据')})
+
+export_response = ns.model('ExportResponse', {'success': fields.Boolean, 'message': fields.String, 'download_url': fields.String})
 
 
-def create_app():
-    app = Flask(__name__)
-    app.secret_key = os.urandom(24)
-    authorizations = {
-        'Bearer Auth': {
-            'type': 'apiKey',
-            'in': 'header',
-            'name': 'Authorization',
-            'description': '输入JWT Bearer令牌'
-        }
-    }
-    api = Api(app, version='1.0', title='Project API', description='本项目的API文档',
-              authorizations=authorizations, security='Bearer Auth', doc='/swagger/')
+@ns.route('/')
+class ExportExcel(Resource):
 
-    CORS(app)
+    @ns.expect(export_input)
+    @ns.response(200, '导出成功', export_response)
+    @ns.response(400, '无效请求')
+    @ns.response(500, '导出失败')
+    @ns.doc(description='将前端查询结果导出为 Excel 文件（自动命名）')
+    @auth_required(roles=['Admin', 'Teacher', 'Student'])
+    def post(self):
+        try:
+            payload = request.get_json()
+            rows = payload.get('data', [])
 
-    # 注册蓝图
-    from app.main import main_bp
-    from app.query import query_bp, query_ns
-    from app.upload import upload_bp, ns as upload_ns
-    from app.add_edit import add_edit_bp, ns as add_edit_ns
-    from app.export import export_bp, ns as export_ns
-    from app.auth import auth_bp, ns as auth_ns
+            if not rows:
+                return {'success': False, 'message': '数据为空，无法导出'}, 400
 
-    app.register_blueprint(main_bp)
-    app.register_blueprint(query_bp)
-    app.register_blueprint(upload_bp)
-    app.register_blueprint(add_edit_bp)
-    app.register_blueprint(export_bp)
-    app.register_blueprint(auth_bp)
+            df = pd.DataFrame(rows)
 
-    # api.init_app(app)  # 延迟绑定
-    api.add_namespace(query_ns, path='/query')
-    api.add_namespace(upload_ns, path='/upload')
-    api.add_namespace(add_edit_ns, path='/add-edit')
-    api.add_namespace(export_ns, path='/export')
-    api.add_namespace(auth_ns, path='/auth')
+            # 自动生成文件名
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            suffix = uuid.uuid4().hex[:8]
+            filename = f"Export_{timestamp}_{suffix}.xlsx"
 
-    return app
+            temp_dir = os.path.join(current_app.root_path, 'temp_exports')
+            os.makedirs(temp_dir, exist_ok=True)
+            file_path = os.path.join(temp_dir, filename)
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'ExportedData'
+
+            ws.append(['序号'] + list(df.columns))
+            for idx, row in enumerate(df.itertuples(index=False), start=1):
+                ws.append([idx] + list(row))
+
+            wb.save(file_path)
+
+            download_url = url_for('export_download_file', filename=filename, _external=True)
+            return {'success': True, 'message': '导出成功', 'download_url': download_url}
+
+        except Exception as e:
+            return {'success': False, 'message': f'导出失败: {str(e)}'}, 500
+
+
+@ns.route('/download/<string:filename>')
+@ns.param('filename', '要下载的文件名')
+class DownloadFile(Resource):
+
+    def get(self, filename):
+        """下载已导出的 Excel 文件"""
+        temp_dir = os.path.join(current_app.root_path, 'temp_exports')
+        file_path = os.path.join(temp_dir, filename)
+        if not os.path.exists(file_path):
+            return {'message': '文件不存在或已过期'}, 404
+
+        return send_from_directory(temp_dir, filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
