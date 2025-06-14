@@ -176,7 +176,7 @@ class QueryResource(Resource):
                     cursor.execute("SELECT project_id FROM StudentProject WHERE student_id = %s", (username, ))
                     project_ids = [str(row['project_id']) for row in cursor.fetchall()]
                     if not project_ids:
-                        return api_response(True, '暂无匹配数据', data={'results': [], 'query_params': data})
+                        return api_response(True, '暂无匹配数据', data={'results': [], 'related_data': {'相关学生': [], '相关教职工': [], '相关科研项目': []}, 'query_params': data})
 
                     placeholders = ','.join(['%s'] * len(project_ids))
                     wheres.append(f"project_id IN ({placeholders})")
@@ -187,7 +187,7 @@ class QueryResource(Resource):
                     cursor.execute("SELECT project_id FROM TeacherProject WHERE teacher_id = %s", (username, ))
                     project_ids = [str(row['project_id']) for row in cursor.fetchall()]
                     if not project_ids:
-                        return api_response(True, '暂无匹配数据', data={'results': [], 'query_params': data})
+                        return api_response(True, '暂无匹配数据', data={'results': [], 'related_data': {'相关学生': [], '相关教职工': [], '相关科研项目': []}, 'query_params': data})
 
                     placeholders = ','.join(['%s'] * len(project_ids))
                     wheres.append(f"project_id IN ({placeholders})")
