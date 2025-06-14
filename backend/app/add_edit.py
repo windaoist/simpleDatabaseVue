@@ -340,63 +340,100 @@ class EditData(Resource):
                     return api_response(False, '仅管理员可编辑学生信息', status=403)
 
                 new_key = record_data.get('student_id')
+                if not new_key:
+                    return api_response(False, '学生学号不能为空', status=400)
+
+                # 如果学号发生变更，检查新学号是否已存在
                 if new_key != old_key:
                     cursor.execute("SELECT 1 FROM Student WHERE student_id=%s", (new_key, ))
                     if cursor.fetchone():
                         return api_response(False, '学生学号已存在', {'type': 'duplicate'}, 409)
 
-                cursor.execute("UPDATE Student SET student_id=%s, name=%s, gender=%s, grade=%s, major=%s, class=%s, phone=%s, email=%s "
-                               "WHERE student_id=%s",
-                               (new_key, record_data.get('name', ''), record_data.get('gender', ''), record_data.get('grade', ''), record_data.get(
-                                   'major', ''), record_data.get('class', ''), record_data.get('phone', ''), record_data.get('email', ''), old_key))
+                # 更新主表字段
+                cursor.execute(
+                    """
+                    UPDATE Student SET student_id=%s, name=%s, gender=%s, grade=%s,
+                    major=%s, class=%s, phone=%s, email=%s WHERE student_id=%s
+                """, (new_key, record_data.get('name', ''), record_data.get('gender', ''), record_data.get('grade', ''), record_data.get(
+                        'major', ''), record_data.get('class', ''), record_data.get('phone', ''), record_data.get('email', ''), old_key))
 
-                cursor.execute("DELETE FROM StudentResearchField WHERE student_id=%s", (new_key, ))
-                # 兼容格式处理：研究领域为ID列表或用顿号分隔的字符串
+                # 获取旧研究领域
+                cursor.execute("SELECT research_field FROM StudentResearchField WHERE student_id=%s", (old_key, ))
+                old_fields = set(row['research_field'] for row in cursor.fetchall())
+
+                # 解析新研究领域
                 research_fields = record_data.get('research_field', [])
                 if isinstance(research_fields, str):
                     research_fields = [rf.strip() for rf in research_fields.split('、') if rf.strip()]
-                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field IN %s", (tuple(research_fields), ))
-                    research_fields = [row['id'] for row in cursor.fetchall()]
-                for rf_id in research_fields:
-                    cursor.execute("INSERT INTO StudentResearchField (student_id, research_field) VALUES (%s, %s)", (new_key, rf_id))
+                    if research_fields:
+                        cursor.execute("SELECT id FROM ResearchFields WHERE research_field IN %s", (tuple(research_fields), ))
+                        research_fields = [row['id'] for row in cursor.fetchall()]
+                new_fields = set(research_fields)
+
+                # 仅当研究领域有变动时才更新
+                if new_fields != old_fields:
+                    cursor.execute("DELETE FROM StudentResearchField WHERE student_id=%s", (old_key, ))
+                    for rf_id in new_fields:
+                        cursor.execute("INSERT INTO StudentResearchField (student_id, research_field) VALUES (%s, %s)", (new_key, rf_id))
+
                 response_data['record'] = {'student_id': new_key}
 
             elif table == 'teacher':
+                # 仅管理员可编辑
                 if role != 'Admin':
                     return api_response(False, '仅管理员可编辑教师信息', status=403)
 
+                # 校验主键
                 new_key = record_data.get('teacher_id')
+                if not new_key:
+                    return api_response(False, '教职工号不能为空', status=400)
+
                 if new_key != old_key:
                     cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id=%s", (new_key, ))
                     if cursor.fetchone():
                         return api_response(False, '教职工号已存在', {'type': 'duplicate'}, 409)
 
+                # 更新主表字段
                 cursor.execute(
-                    "UPDATE Teacher SET teacher_id=%s, name=%s, gender=%s, title=%s, college=%s, department=%s, phone=%s, email=%s, office_location=%s, introduction=%s "
-                    "WHERE teacher_id=%s", (new_key, record_data.get('name', ''), record_data.get('gender', ''), record_data.get(
-                        'title', ''), record_data.get('college', ''), record_data.get('department', ''), record_data.get(
-                            'phone', ''), record_data.get('email', ''), record_data.get('office_location', ''), record_data.get('introduction', ''), old_key))
+                    """
+                    UPDATE Teacher SET
+                        teacher_id=%s, name=%s, gender=%s, title=%s,
+                        college=%s, department=%s, phone=%s, email=%s,
+                        office_location=%s, introduction=%s
+                    WHERE teacher_id=%s
+                """, (new_key, record_data.get('name', ''), record_data.get('gender', ''), record_data.get('title', ''), record_data.get(
+                        'college', ''), record_data.get('department', ''), record_data.get('phone', ''), record_data.get(
+                            'email', ''), record_data.get('office_location', ''), record_data.get('introduction', ''), old_key))
 
-                cursor.execute("DELETE FROM TeacherResearchField WHERE teacher_id=%s", (new_key, ))
-                research_fields = record_data.get('research_field', [])
-                if isinstance(research_fields, str):
-                    research_fields = [rf.strip() for rf in research_fields.split('、') if rf.strip()]
-                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field IN %s", (tuple(research_fields), ))
-                    research_fields = [row['id'] for row in cursor.fetchall()]
-                for rf_id in research_fields:
-                    cursor.execute("INSERT INTO TeacherResearchField (teacher_id, research_field) VALUES (%s, %s)", (new_key, rf_id))
+                # 获取旧研究领域
+                cursor.execute("SELECT research_field FROM TeacherResearchField WHERE teacher_id=%s", (old_key, ))
+                old_fields = set(row['research_field'] for row in cursor.fetchall())
+
+                # 解析新研究领域
+                research_fields_raw = record_data.get('research_field', [])
+                if isinstance(research_fields_raw, str):
+                    research_fields_raw = [rf.strip() for rf in research_fields_raw.split('、') if rf.strip()]
+                    if research_fields_raw:
+                        cursor.execute("SELECT id FROM ResearchFields WHERE research_field IN %s", (tuple(research_fields_raw), ))
+                        research_fields_raw = [row['id'] for row in cursor.fetchall()]
+                new_fields = set(research_fields_raw)
+
+                # 仅当研究领域有变动时才更新
+                if new_fields != old_fields:
+                    cursor.execute("DELETE FROM TeacherResearchField WHERE teacher_id=%s", (old_key, ))
+                    for rf_id in new_fields:
+                        cursor.execute("INSERT INTO TeacherResearchField (teacher_id, research_field) VALUES (%s, %s)", (new_key, rf_id))
+
                 response_data['record'] = {'teacher_id': new_key}
 
             elif table == 'project':
-                # 读取三项状态字段
+                # 获取项目三项状态字段
                 cursor.execute(
                     """
-                    SELECT project_application_status,
-                        project_approval_status,
-                        project_acceptance_status
+                    SELECT project_application_status, project_approval_status, project_acceptance_status
                     FROM Project
                     WHERE project_id = %s
-                    """, (old_key, ))
+                """, (old_key, ))
                 row = cursor.fetchone()
                 if not row:
                     return api_response(False, '项目不存在', status=400)
@@ -405,11 +442,11 @@ class EditData(Resource):
                 aprv_status = row['project_approval_status']  # 未审批 / 审批通过
                 accp_status = row['project_acceptance_status']  # 未验收 / 验收通过
 
-                # ----------- 验收通过 → 禁止任何人编辑 -----------
+                # 1. 验收通过，禁止编辑
                 if accp_status == '验收通过':
                     return api_response(False, '项目已验收通过，禁止编辑', status=403)
 
-                # ----------- 未申报 → 只有负责人(学生)可编辑 -----
+                # 2. 未申报，只有负责人(学生)可编辑
                 if app_status == '未申报':
                     if role != 'Student':
                         return api_response(False, '仅负责人可编辑未申报项目', status=403)
@@ -417,7 +454,7 @@ class EditData(Resource):
                     if not cursor.fetchone():
                         return api_response(False, '您无权编辑该项目（不是负责人）', status=403)
 
-                # ----------- 申报通过 & 未审批 → 指导教师可编辑 ---
+                # 3. 申报通过 & 未审批，指导教师可编辑
                 elif app_status == '申报通过' and aprv_status == '未审批':
                     if role != 'Teacher':
                         return api_response(False, '仅指导教师可编辑该项目', status=403)
@@ -425,77 +462,49 @@ class EditData(Resource):
                     if not cursor.fetchone():
                         return api_response(False, '您无权编辑该项目（不是指导教师）', status=403)
 
-                # ----------- 审批通过 & 未验收 → 仅 Admin 可编辑 ---
+                # 4. 审批通过 & 未验收，仅 Admin 可编辑
                 elif aprv_status == '审批通过' and accp_status == '未验收':
                     if role != 'Admin':
                         return api_response(False, '仅管理员可编辑该项目', status=403)
 
-                # ----------- 任何其它组合（异常） → 默认仅 Admin -------
+                # 5. 其他异常状态组合
                 else:
                     if role != 'Admin':
                         return api_response(False, '当前状态禁止编辑', status=403)
 
+                # 校验新ID是否重复
                 new_key = record_data.get('project_id')
                 if new_key != old_key:
                     cursor.execute("SELECT 1 FROM Project WHERE project_id=%s", (new_key, ))
                     if cursor.fetchone():
                         return api_response(False, '项目编号已存在', {'type': 'duplicate'}, 409)
 
-                # 校验是否存在
-                cursor.execute("SELECT project_approval_status, project_acceptance_status FROM Project WHERE project_id=%s", (old_key, ))
-                row = cursor.fetchone()
-                if not row:
-                    return api_response(False, '项目不存在', status=400)
+                # 更新主表内容
+                cursor.execute(
+                    """
+                    UPDATE Project SET
+                        project_id=%s,
+                        name=%s,
+                        project_content=%s
+                    WHERE project_id=%s
+                """, (new_key, record_data.get('name', ''), record_data.get('project_content', ''), old_key))
 
-                # 权限限制：审批通过或验收通过仅 Admin 可编辑
-                if (row['project_approval_status'] == '审批通过' or row['project_acceptance_status'] == '验收通过') and role != 'Admin':
-                    return api_response(False, '项目已审批或验收，仅管理员可编辑', status=403)
+                # 比对研究领域是否变更
+                cursor.execute("SELECT research_field FROM ProjectResearchField WHERE project_id=%s", (old_key, ))
+                old_fields = set(row['research_field'] for row in cursor.fetchall())
 
-                # 权限限制：学生需为负责人，教师需为指导老师
-                if role == 'Student':
-                    cursor.execute("SELECT 1 FROM StudentProject WHERE project_id=%s AND student_id=%s AND role='负责人'", (old_key, user_id))
-                    if not cursor.fetchone():
-                        return api_response(False, '您无权编辑该项目（不是负责人）', status=403)
-                elif role == 'Teacher':
-                    cursor.execute("SELECT 1 FROM TeacherProject WHERE project_id=%s AND teacher_id=%s", (old_key, user_id))
-                    if not cursor.fetchone():
-                        return api_response(False, '您无权编辑该项目（不是指导教师）', status=403)
-
-                # 校验负责人和指导老师不能为空
-                leader_id = record_data.get('负责人学号', '').strip()
-                teacher_ids = [tid.strip() for tid in record_data.get('指导教师工号', '').split('、') if tid.strip()]
-                if not leader_id or not teacher_ids:
-                    return api_response(False, '负责人和指导老师不能为空', status=400)
-
-                # 更新主表
-                cursor.execute("UPDATE Project SET project_id=%s, name=%s, project_content=%s WHERE project_id=%s",
-                               (new_key, record_data.get('name', ''), record_data.get('project_content', ''), old_key))
-
-                # 更新研究领域
-                cursor.execute("DELETE FROM ProjectResearchField WHERE project_id=%s", (new_key, ))
                 research_fields = record_data.get('research_field', [])
                 if isinstance(research_fields, str):
                     research_fields = [rf.strip() for rf in research_fields.split('、') if rf.strip()]
-                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field IN %s", (tuple(research_fields), ))
-                    research_fields = [row['id'] for row in cursor.fetchall()]
-                for rf_id in research_fields:
-                    cursor.execute("INSERT INTO ProjectResearchField (project_id, research_field) VALUES (%s, %s)", (new_key, rf_id))
+                    if research_fields:
+                        cursor.execute("SELECT id FROM ResearchFields WHERE research_field IN %s", (tuple(research_fields), ))
+                        research_fields = [row['id'] for row in cursor.fetchall()]
+                new_fields = set(research_fields)
 
-                # 更新参与人员关系
-                cursor.execute("DELETE FROM StudentProject WHERE project_id=%s", (new_key, ))
-                cursor.execute("DELETE FROM TeacherProject WHERE project_id=%s", (new_key, ))
-
-                # 插入负责人
-                cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (leader_id, new_key))
-
-                # 插入成员
-                member_ids = [mid.strip() for mid in record_data.get('成员学号', '').split('、') if mid.strip()]
-                for mid in member_ids:
-                    cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (mid, new_key))
-
-                # 插入指导教师
-                for tid in teacher_ids:
-                    cursor.execute("INSERT INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (tid, new_key))
+                if new_fields != old_fields:
+                    cursor.execute("DELETE FROM ProjectResearchField WHERE project_id=%s", (old_key, ))
+                    for rf_id in new_fields:
+                        cursor.execute("INSERT INTO ProjectResearchField (project_id, research_field) VALUES (%s, %s)", (new_key, rf_id))
 
                 response_data['record'] = {'project_id': new_key}
 
