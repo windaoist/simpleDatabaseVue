@@ -14,7 +14,7 @@ export_input = ns.model('ExportInput', {'data': fields.List(fields.Raw, required
 export_response = ns.model('ExportResponse', {'success': fields.Boolean, 'message': fields.String, 'download_url': fields.String})
 
 
-@ns.route('/excel')
+@ns.route('/export')
 class ExportExcel(Resource):
 
     @ns.expect(export_input)
