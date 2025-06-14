@@ -7,7 +7,7 @@ import { getTableSchema, getPrimaryKey, getPrimaryLabel } from '@/stores/TableSt
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AddForm from '@/components/AddForm.vue'
 const queryForm = ref({
-  table: '' as 'student' | 'teacher' | 'project' | '',
+  table: '' as 'student' | 'teacher' | 'project' | 'project_submit' | '',
   filters: {} as Record<string, any>,
   // 移除了单独的 research_field，现在它包含在 filters 中
 })
