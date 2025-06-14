@@ -333,8 +333,17 @@ class EditData(Resource):
 
         try:
             if table == 'student':
-                if role != 'Admin':
-                    return api_response(False, '仅管理员可编辑学生信息', status=403)
+                target_id = record_data.get('student_id')  # 正在被修改的学生ID
+                if not target_id:
+                    return api_response(False, '缺少学生学号', status=400)
+
+                if role == 'Admin':
+                    pass  # 管理员可修改任何学生信息
+                elif role == 'Student':
+                    if target_id != user_id:
+                        return api_response(False, '您无权修改其他学生的信息', status=403)
+                else:
+                    return api_response(False, '无权限修改学生信息', status=403)
 
                 student_id = record_data.get('student_id')
                 if not student_id:
@@ -377,8 +386,17 @@ class EditData(Resource):
                 response_data['record'] = {'student_id': student_id}
 
             elif table == 'teacher':
-                if role != 'Admin':
-                    return api_response(False, '仅管理员可编辑教师信息', status=403)
+                target_id = record_data.get('teacher_id')  # 正在被修改的教职工ID
+                if not target_id:
+                    return api_response(False, '缺少教职工号', status=400)
+
+                if role == 'Admin':
+                    pass  # 管理员可修改任何教职工信息
+                elif role == 'Teacher':
+                    if target_id != user_id:
+                        return api_response(False, '您无权修改其他教职工的信息', status=403)
+                else:
+                    return api_response(False, '无权限修改教职工信息', status=403)
 
                 teacher_id = record_data.get('teacher_id')
                 if not teacher_id:
