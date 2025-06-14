@@ -9,7 +9,7 @@ from app.utils import auth_required
 
 ns = Namespace('data', path='/', description='数据操作接口')
 
-export_input = ns.model('ExportInput', {'data': fields.List(fields.Raw, required=True, description='待导出的数据')})
+export_bp = ns.model('ExportInput', {'data': fields.List(fields.Raw, required=True, description='待导出的数据')})
 
 export_response = ns.model('ExportResponse', {'success': fields.Boolean, 'message': fields.String, 'download_url': fields.String})
 
@@ -17,7 +17,7 @@ export_response = ns.model('ExportResponse', {'success': fields.Boolean, 'messag
 @ns.route('/export')
 class ExportExcel(Resource):
 
-    @ns.expect(export_input)
+    @ns.expect(export_bp)
     @ns.response(200, '导出成功', export_response)
     @ns.response(400, '无效请求')
     @ns.response(500, '导出失败')
