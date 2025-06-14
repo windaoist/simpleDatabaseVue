@@ -123,42 +123,47 @@ CREATE TABLE IF NOT EXISTS ProjectResearchField (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
--- 触发器设置（自动状态更新）
-
--- 申报状态自动置为“申报通过”
+-- 触发器设置
+-- 项目申报触发器：project_application_status → 申报通过
 DELIMITER $$
-CREATE TRIGGER trg_project_application
+
+CREATE TRIGGER trg_project_application_status
 BEFORE UPDATE ON Project
 FOR EACH ROW
 BEGIN
-    IF NEW.project_application_status != OLD.project_application_status AND NEW.project_application_status IS NOT NULL THEN
+    IF NEW.project_application_status = 'SUBMIT' AND OLD.project_application_status = '未申报' THEN
         SET NEW.project_application_status = '申报通过';
     END IF;
 END$$
+
 DELIMITER ;
 
--- 审批状态自动置为“审批通过”
+-- 项目审批触发器：project_approval_status → 审批通过
 DELIMITER $$
-CREATE TRIGGER trg_project_approval
+
+CREATE TRIGGER trg_project_approval_status
 BEFORE UPDATE ON Project
 FOR EACH ROW
 BEGIN
-    IF NEW.project_approval_status != OLD.project_approval_status AND NEW.project_approval_status IS NOT NULL THEN
+    IF NEW.project_approval_status = 'APPROVE' AND OLD.project_approval_status = '未审批' THEN
         SET NEW.project_approval_status = '审批通过';
     END IF;
 END$$
+
 DELIMITER ;
 
--- 验收状态自动置为“验收通过”
+-- 项目验收触发器：project_acceptance_status → 验收通过
 DELIMITER $$
-CREATE TRIGGER trg_project_acceptance
+
+CREATE TRIGGER trg_project_acceptance_status
 BEFORE UPDATE ON Project
 FOR EACH ROW
 BEGIN
-    IF NEW.project_acceptance_status != OLD.project_acceptance_status AND NEW.project_acceptance_status IS NOT NULL THEN
+    IF NEW.project_acceptance_status = 'ACCEPT' AND OLD.project_acceptance_status = '未验收' THEN
         SET NEW.project_acceptance_status = '验收通过';
     END IF;
 END$$
+
 DELIMITER ;
 
 
