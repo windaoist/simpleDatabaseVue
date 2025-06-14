@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { inject, computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { DocumentAdd, Upload, Search, User } from '@element-plus/icons-vue'
 const navItems = [
-  { name: '添加数据', path: '/add' },
-  { name: '上传数据', path: '/upload' },
-  { name: '查询数据', path: '/query' },
+  { name: '添加数据', path: '/add', icon: DocumentAdd },
+  { name: '上传数据', path: '/upload', icon: Upload },
+  { name: '查询数据', path: '/query', icon: Search },
+  { name: '我的账户', path: '/profile', icon: User },
 ]
+const isLoggedIn = inject('isLoggedIn')
+
+const visibleNavItems = computed(() => {
+  return isLoggedIn ? navItems : navItems.slice(0, navItems.length - 1)
+})
 </script>
 
 <template>
@@ -15,7 +23,7 @@ const navItems = [
         :sm="12"
         :md="12"
         :lg="12"
-        v-for="item in navItems"
+        v-for="item in visibleNavItems"
         :key="item.path"
         class="grid-item"
       >
@@ -23,7 +31,7 @@ const navItems = [
           <div class="card-content">
             <div class="card-icon">
               <div class="icon-wrapper">
-                <span class="icon-text">{{ item.name.charAt(0) }}</span>
+                <component :is="item.icon" class="card-el-icon" />
               </div>
             </div>
             <h2>{{ item.name }}</h2>
@@ -43,7 +51,11 @@ const navItems = [
 .grid-item {
   padding-bottom: 30px; /* 垂直间距 */
 }
-
+.card-el-icon {
+  width: 40px;
+  height: 40px;
+  /* fill: currentColor;  // 如果图标颜色异常可加 */
+}
 .operation-card {
   border-radius: 12px;
   border: none;

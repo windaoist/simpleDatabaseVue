@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, provide } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
@@ -8,6 +8,7 @@ const navItems = [
   { name: '添加数据', path: '/add' },
   { name: '上传数据', path: '/upload' },
   { name: '查询数据', path: '/query' },
+  // { name: '我的账户', path: '/profile' },
 ]
 const roles = [
   { name: '管理员', value: 'Admin' },
@@ -40,6 +41,7 @@ async function handleLogin() {
   }
   loginDialogVisible.value = false
   isLoggedIn.value = true
+  window.location.reload()
   console.log('登录成功', account.value)
   ElMessage.success('登录成功')
 }
@@ -51,12 +53,14 @@ async function handleLogout() {
     isLoggedIn.value = false
     currentUser.value = '游客'
     // LoggedIn.value = false
+    window.location.reload()
     ElMessage.success('注销成功')
   } catch (error) {
     console.error('注销失败', error.message)
     ElMessage.error('注销失败：' + error.response?.data?.message || '请稍后再试')
   }
 }
+provide('isLoggedIn', isLoggedIn.value)
 onMounted(() => {
   console.log(window.devicePixelRatio)
   currentUser.value = ref(localStorage.getItem('current_user') || '游客')
@@ -142,6 +146,9 @@ onMounted(() => {
             </ElMenuItem>
             <ElMenuItem v-for="item in navItems" :key="item.path" :index="item.path">
               <RouterLink :to="item.path">{{ item.name }}</RouterLink>
+            </ElMenuItem>
+            <ElMenuItem :index="'/profile'" v-if="isLoggedIn">
+              <RouterLink to="/profile">我的账户</RouterLink>
             </ElMenuItem>
           </ElMenu>
         </div>

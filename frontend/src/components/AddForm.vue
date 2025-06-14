@@ -3,7 +3,7 @@
 import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
-import { getPrimaryLabel, getTableSchema } from '@/stores/TableStructure'
+import { getPrimaryLabel, getTableSchema } from '@/utils/TableStructure'
 
 const props = defineProps({
   currentTable: {
@@ -252,7 +252,6 @@ function handleSubmit() {
               v-else-if="field.name === 'gender'"
               v-model="formData.filters[field.name]"
               placeholder="请选择性别"
-              clearable
               style="width: 100%"
             >
               <el-option
@@ -318,7 +317,7 @@ function handleSubmit() {
   grid-template-columns: repeat(2, 1fr);
   gap: 20px 30px;
   max-width: 1200px;
-  margin: 20px auto;
+  margin: 20px 0px 0px 60px;
   padding: 0 15px;
   align-items: start;
 }
