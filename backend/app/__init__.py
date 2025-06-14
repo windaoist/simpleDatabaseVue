@@ -27,7 +27,6 @@ def create_app():
     from app.add_edit import add_edit_bp, ns as add_edit_ns
     from app.export import export_bp, ns as export_ns
     from app.auth import auth_bp, ns as auth_ns
-    from app.action import action_bp, ns as action_ns
 
     app.register_blueprint(main_bp)
     app.register_blueprint(query_bp)
@@ -35,7 +34,6 @@ def create_app():
     app.register_blueprint(add_edit_bp)
     app.register_blueprint(export_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(action_bp)
 
     # api.init_app(app)  # 延迟绑定
     api.add_namespace(query_ns, path='/query')
@@ -43,6 +41,5 @@ def create_app():
     api.add_namespace(add_edit_ns, path='/add-edit')
     api.add_namespace(export_ns, path='/export')
     api.add_namespace(auth_ns, path='/auth')
-    api.add_namespace(action_ns, path='/action')
 
     return app
