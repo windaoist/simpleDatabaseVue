@@ -3,45 +3,41 @@
 import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
-import { getPrimaryKey, getTableSchema } from '@/stores/TableStructure'
+import { getPrimaryLabel, getTableSchema } from '@/stores/TableStructure'
 
 const props = defineProps({
   currentTable: {
-    type: String as () => 'student' | 'teacher' | 'project_submit' | '',
+    type: String as () => 'student' | 'teacher' | 'project_submit' | 'project' | '',
     required: true,
   },
   researchFields: {
     type: Array as () => Array<{ id: string; research_field: string }>,
     required: true,
   },
-  // 添加可选的 initialData prop 用于编辑模式
+  // 初始筛选数据（不包括成员）
   initialData: {
     type: Object as () => {
       filters: Record<string, any>
-      memberList: {
-        members: Record<string, string>[]
-        instructors: Record<string, string>[]
-      }
     } | null,
     default: null,
   },
 })
 
 const emit = defineEmits(['submit', 'update'])
-
+const currentUser = ref(localStorage.getItem('current_user') || '')
 const fields = ref([])
-const primaryKey = ref()
+const primaryLabel = ref()
 const tempInput = ref({
-  members: '',
-  instructors: '',
+  member: '',
+  teacher: '',
 })
 const memberList = ref({
-  members: [] as Record<string, string>[],
-  instructors: [] as Record<string, string>[],
+  member: [] as Record<string, string>[],
+  teacher: [] as Record<string, string>[],
 })
 const loading = ref({
-  members: false,
-  instructors: false,
+  member: false,
+  teacher: false,
 })
 const formData = ref({
   filters: {} as Record<string, any>,
@@ -60,8 +56,50 @@ watch(
   },
   { immediate: true },
 )
+watch(
+  () => props.initialData,
+  (newVal) => {
+    if (newVal) {
+      initialize(props.currentTable)
+    }
+  },
+  { deep: true, immediate: true },
+)
+function parseNameIdPairs(str: string): Record<string, string>[] {
+  const result: Record<string, string>[] = []
+  const regex = /([\u4e00-\u9fa5\w]+)\((\d+)\)/g
+  let match
+  while ((match = regex.exec(str)) !== null) {
+    const name = match[1]
+    const id = match[2]
+    result.push({ [id]: name })
+  }
+  return result
+}
+function initialize(tableName) {
+  // 如果有初始数据，则使用它填充表单
+  if (props.initialData) {
+    formData.value.filters = { ...props.initialData.filters }
+    if (tableName == 'project') {
+      memberList.value = {
+        member: parseNameIdPairs(props.initialData.filters['member'] || ''),
+        teacher: parseNameIdPairs(props.initialData.filters['teacher'] || ''),
+      }
+    }
+  } else {
+    // 否则初始化为空表单
+    formData.value.filters = {}
+    if (tableName == 'project') {
+      memberList.value = {
+        member: [] as Record<string, string>[],
+        teacher: [] as Record<string, string>[],
+      }
+    }
+  }
 
-async function onQuery(tableName: 'student' | 'teacher' | 'project_submit' | 'project') {
+  primaryLabel.value = getPrimaryLabel(tableName) || ''
+}
+function onQuery(tableName: 'student' | 'teacher' | 'project_submit' | 'project') {
   try {
     const rawFields = getTableSchema(tableName)
     fields.value = rawFields.map((field) => {
@@ -70,24 +108,9 @@ async function onQuery(tableName: 'student' | 'teacher' | 'project_submit' | 'pr
       }
       return field
     })
-
-    // 如果有初始数据，则使用它填充表单
-    if (props.initialData) {
-      formData.value.filters = { ...props.initialData.filters }
-      memberList.value = {
-        members: [...props.initialData.memberList.members],
-        instructors: [...props.initialData.memberList.instructors],
-      }
-    } else {
-      // 否则初始化为空表单
-      formData.value.filters = {}
-      memberList.value = {
-        members: [] as Record<string, string>[],
-        instructors: [] as Record<string, string>[],
-      }
+    if (isEditMode.value) {
+      initialize(tableName)
     }
-
-    primaryKey.value = getPrimaryKey(tableName) || ''
   } catch (error) {
     ElMessage.error('获取表格式失败: ' + (error as Error).message)
   }
@@ -103,7 +126,7 @@ async function validateAndAdd(fieldName: string) {
     loading.value[fieldName] = true
     const response = await request.get('add-edit/validate_id', {
       params: {
-        type: fieldName == 'members' ? 'student' : 'teacher',
+        type: fieldName == 'member' ? 'student' : 'teacher',
         id: id,
       },
     })
@@ -113,7 +136,7 @@ async function validateAndAdd(fieldName: string) {
         return
       }
       const memberName =
-        response.data.data[(fieldName == 'members' ? 'student' : 'teacher') + '_name']
+        response.data.data[(fieldName == 'member' ? 'student' : 'teacher') + '_name']
       memberList.value[fieldName].push({ [id]: memberName })
     } else {
       ElMessage.error('不存在此学生／教职工')
@@ -156,16 +179,15 @@ function handleSubmit() {
           :label="field.label"
           style="flex: 1; min-width: 250px; margin-bottom: 20px"
         >
-          <template v-if="field.name === 'head'">
+          <template v-if="field.name === 'leader'">
             <el-input
-              v-if="field.name === 'head'"
-              v-model="formData.filters[field.name]"
-              placeholder="负责人"
+              v-if="field.name === 'leader'"
+              :placeholder="currentUser"
               disabled
               style="width: 100%"
             />
           </template>
-          <template v-else-if="field.name === 'members' || field.name === 'instructors'">
+          <template v-else-if="field.name === 'member' || field.name === 'teacher'">
             <div class="input-row" style="width: 100%">
               <el-input
                 v-model="tempInput[field.name]"
@@ -174,11 +196,13 @@ function handleSubmit() {
                 "
                 @keyup.enter="validateAndAdd(field.name)"
                 class="input-item"
+                :disabled="isEditMode"
               />
               <el-button
                 type="primary"
                 @click="validateAndAdd(field.name)"
                 :loading="loading[field.name]"
+                :disabled="isEditMode"
               >
                 添加
               </el-button>
@@ -189,7 +213,7 @@ function handleSubmit() {
                 v-for="(member, index) in memberList[field.name]"
                 :key="index"
                 type="info"
-                closable
+                :closable="!isEditMode"
                 @close="removeMember(field.name, index)"
                 class="tag-item"
               >
@@ -219,15 +243,9 @@ function handleSubmit() {
               v-else-if="field.name.includes('_status')"
               v-model="formData.filters[field.name]"
               placeholder="请选择状态"
-              clearable
+              disabled
               style="width: 100%"
             >
-              <el-option
-                v-for="option in field.options"
-                :key="option.value"
-                :label="option.label"
-                :value="option.value"
-              />
             </el-select>
 
             <el-select
@@ -245,6 +263,14 @@ function handleSubmit() {
               />
             </el-select>
 
+            <el-input
+              v-else-if="field.label === primaryLabel"
+              v-model="formData.filters[field.name]"
+              disabled
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 4 }"
+              style="width: 100%"
+            />
             <el-input
               v-else
               v-model="formData.filters[field.name]"

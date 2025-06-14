@@ -3,9 +3,9 @@
 import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import * as translate from '@/stores/LanguageConverter'
-import { getTableSchema, getPrimaryKey } from '@/stores/TableStructure'
+import { getTableSchema, getPrimaryKey, getPrimaryLabel } from '@/stores/TableStructure'
 import { ElMessage, ElMessageBox } from 'element-plus'
-
+import AddForm from '@/components/AddForm.vue'
 const queryForm = ref({
   table: '' as 'student' | 'teacher' | 'project' | '',
   filters: {} as Record<string, any>,
@@ -24,7 +24,7 @@ const fields = ref<
   }>
 >([])
 
-const research_fields = ref<Array<{ id: number; research_field: string }>>([])
+const research_fields = ref<Array<{ id: string; research_field: string }>>([])
 // const currentForm = ref('')
 const responseData = ref({
   data: {
@@ -38,9 +38,16 @@ const responseData = ref({
 })
 const activeName = ref()
 const primaryKey = ref()
+const primaryLabel = ref()
+const dialogVisible = ref(false)
+const selectedRow = ref(null)
 
+function openEditDialog(row) {
+  selectedRow.value = { ...row } // 深拷贝，避免原表数据污染
+  dialogVisible.value = true
+}
 // 当表名改变时获取表结构
-async function onTableChange() {
+function onTableChange() {
   try {
     if (!queryForm.value.table) {
       ElMessage.error('请选择查询表名')
@@ -72,7 +79,7 @@ async function onTableChange() {
 
     // 获取主键
     primaryKey.value = getPrimaryKey(queryForm.value.table) || ''
-
+    primaryLabel.value = getPrimaryLabel(queryForm.value.table) || ''
     console.log('表结构:', fields.value)
   } catch (error) {
     ElMessage.error('获取表格式失败: ' + (error as Error).message)
@@ -135,40 +142,42 @@ const editableColumns = computed(() => {
     : Object.keys(responseData.value.data.results[0]).filter((k) => k !== '序号')
 })
 
-// 检查行是否在编辑状态
-const isEditing = (index) => {
-  return editingId.value === index
-}
+// // 检查行是否在编辑状态
+// const isEditing = (index) => {
+//   return editingId.value === index
+// }
 
-// 处理编辑操作
-const handleEdit = (row, index) => {
-  // 保存原始数据（深拷贝）
-  originalData.value = JSON.parse(JSON.stringify(row))
-  // console.log('123', originalData.value[row.序号]);
-  editingId.value = index
-}
+// // 处理编辑操作
+// const handleEdit = (row, index) => {
+//   // 保存原始数据（深拷贝）
+//   originalData.value = JSON.parse(JSON.stringify(row))
+//   // console.log('123', originalData.value[row.序号]);
+//   editingId.value = index
+// }
 
-// 处理重置操作
-const handleReset = (row) => {
-  // 恢复原始数据
-  Object.assign(row, originalData.value)
-  editingId.value = null
-  originalData.value = null
-}
+// // 处理重置操作
+// const handleReset = (row) => {
+//   // 恢复原始数据
+//   Object.assign(row, originalData.value)
+//   editingId.value = null
+//   originalData.value = null
+// }
 // 处理提交操作
-const handleSubmit = async (row) => {
+async function handleSubmit(formData: { filters: any; memberList: any }) {
   try {
-    console.log('提交数据:', row)
-    const primary = row[primaryKey.value]
+    console.log('提交数据:', formData.filters)
     const payload = {
       table: queryForm.value.table,
-      old_key: primary,
       data: {
-        ...Object.fromEntries(
-          Object.entries(row)
-            .filter(([k]) => k !== '序号')
-            .map(([k, v]) => [translate.translateToEnglish(k), v]),
-        ),
+        ...formData.filters,
+        research_field: formData.filters.research_field
+          ? formData.filters.research_field
+              .map((name) => {
+                const match = research_fields.value.find((field) => field.research_field === name)
+                return match ? match.id : null
+              })
+              .filter((id) => id !== null)
+          : null,
       },
     }
     const response = await request.post('add-edit/edit', payload)
@@ -199,14 +208,14 @@ async function handleDelete(row) {
         console.log('用户取消删除')
         throw '取消' // 抛出异常以跳过后续操作
       })
-    const primary = row[translate.translateToChinese(primaryKey.value)]
+    const primary = row[primaryLabel.value]
     const payload = {
       table: queryForm.value.table,
       key: primary,
     }
     const response = await request.post('add-edit/delete', payload)
     responseData.value.data.results = responseData.value.data.results.filter(
-      (item) => item[translate.translateToChinese(primaryKey.value)] !== primary,
+      (item) => item[primaryLabel.value] !== primary,
     )
     ElMessage.success((await response).data.message)
   } catch (error) {
@@ -257,6 +266,29 @@ onMounted(() => {
 </script>
 <template>
   <div>
+    <!-- 编辑弹窗 -->
+    <el-dialog v-model="dialogVisible" title="编辑记录" width="50%">
+      <div>
+        <AddForm
+          :current-table="queryForm.table"
+          :research-fields="research_fields"
+          :initial-data="{
+            filters: Object.fromEntries(
+              Object.entries(selectedRow)
+                .filter(([k]) => k !== '序号')
+                .map(([k, v]) => {
+                  const translatedKey = translate.translateToEnglish(k)
+                  if (translatedKey === 'research_field' && typeof v === 'string') {
+                    return [translatedKey, v.split('、')]
+                  }
+                  return [translatedKey, v]
+                }),
+            ),
+          }"
+          @update="handleSubmit"
+        />
+      </div>
+    </el-dialog>
     <div class="query-view">
       <el-form :inline="true" label-position="left" label-width="100px" :model="queryForm">
         <el-form-item label="查询表名">
@@ -372,19 +404,9 @@ onMounted(() => {
 
             <!-- 固定操作列 -->
             <el-table-column label="操作" fixed="right" width="180">
-              <template #default="{ row, $index }">
-                <div v-if="isEditing($index)">
-                  <el-button size="small" @click="handleReset(row)">重置</el-button>
-                  <el-button size="small" type="primary" @click="handleSubmit(row)">提交</el-button>
-                </div>
-                <div v-else>
-                  <el-button size="small" @click="handleEdit(row, $index)" :disabled="!!editingId">
-                    编辑
-                  </el-button>
-                  <el-button size="small" @click="handleDelete(row)" :disabled="!!editingId">
-                    删除
-                  </el-button>
-                </div>
+              <template #default="{ row }">
+                <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
+                <el-button size="small" @click="handleDelete(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
