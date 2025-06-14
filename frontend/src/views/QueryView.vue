@@ -2,12 +2,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
-import * as translate from '@/stores/LanguageConverter'
-import { getTableSchema, getPrimaryKey, getPrimaryLabel } from '@/stores/TableStructure'
+import * as translate from '@/utils/LanguageConverter'
+import { getTableSchema, getPrimaryKey, getPrimaryLabel } from '@/utils/TableStructure'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AddForm from '@/components/AddForm.vue'
 const queryForm = ref({
-  table: '' as 'student' | 'teacher' | 'project' | '',
+  table: '' as 'student' | 'teacher' | 'project' | 'project_submit' | '',
   filters: {} as Record<string, any>,
   // 移除了单独的 research_field，现在它包含在 filters 中
 })
@@ -385,7 +385,7 @@ onMounted(() => {
       </el-form>
     </div>
 
-    <el-tabs class="query-result" v-model="activeName" v-if="responseData.data">
+    <el-tabs type="border-card" class="query-result" v-model="activeName" v-if="responseData.data">
       <el-tab-pane label="查询结果" name="query-result">
         <div class="section" v-if="responseData.data.results.length > 0">
           <el-table :data="responseData.data.results" :max-height="500" style="width: 100%">
