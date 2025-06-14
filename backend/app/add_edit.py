@@ -51,6 +51,13 @@ project_model = ns.model(
         'project_content': fields.String(description='项目内容')
     })
 
+# 状态模型
+mark_status_model = ns.model(
+    'MarkStatusRequest', {
+        'project_id': fields.String(required=True, description='项目编号'),
+        'action': fields.String(required=True, enum=['application', 'approval', 'acceptance'], description='操作类型')
+    })
+
 # 删除操作解析器
 delete_parser = reqparse.RequestParser()
 delete_parser.add_argument('table', type=str, required=True, help='表名', location='json')
@@ -625,63 +632,113 @@ class DeleteData(Resource):
             connection.close()
 
 
-@ns.route('/project/mark-status')
+@ns.route('/mark-status')
 class ProjectMarkStatus(Resource):
+
+    @ns.expect(ns.model('MarkStatusRequest', {'project_id': fields.String(required=True, description='项目编号')}))
+    @ns.response(200, '状态更新成功')
+    @ns.response(400, '请求参数错误')
+    @ns.response(403, '权限不足或条件不符')
+    @ns.response(404, '项目或用户不存在')
+    @ns.response(500, '数据库错误')
+    @auth_required(roles=['Admin', 'Teacher', 'Student'])
     def post(self):
-        """
-        变更项目状态：申报 / 审批 / 验收
-        前端传入：
-        - project_id: 项目编号
-        - action: 'application' | 'approval' | 'acceptance'
-        - 自动根据当前用户身份写入 MySQL 会话变量，触发器完成拼接
-        """
+        """点击一次自动判断当前用户权限与项目状态，完成状态推进"""
         user = request.user
         username = user['username']
         role = user['role']
-        data = request.json
 
+        data = request.get_json()
         project_id = data.get('project_id')
-        action = data.get('action')
-
-        if not project_id or action not in ('application', 'approval', 'acceptance'):
-            return api_response(False, '参数错误', status=400)
+        if not project_id:
+            return api_response(False, '缺少项目编号', status=400)
 
         conn = get_db_connection()
         cursor = conn.cursor()
+
         try:
+            # 查询项目当前三项状态
+            cursor.execute(
+                """
+                SELECT project_application_status, project_approval_status, project_acceptance_status
+                FROM Project WHERE project_id = %s
+            """, (project_id, ))
+            project = cursor.fetchone()
+            if not project:
+                return api_response(False, '项目不存在', status=404)
+
+            app_status = project['project_application_status']
+            aprv_status = project['project_approval_status']
+            accp_status = project['project_acceptance_status']
+
             # 获取用户姓名
             if role == 'Student':
-                cursor.execute("SELECT name FROM Student WHERE student_id=%s", (username,))
-                role_label = '学生'
+                cursor.execute("SELECT name FROM Student WHERE student_id = %s", (username, ))
+                row = cursor.fetchone()
+                if not row:
+                    return api_response(False, '学生用户不存在', status=404)
+                full_role = f"学生{row['name']}"
+
+                # 学生只能进行“申报”操作
+                if app_status == '未申报':
+                    cursor.execute(
+                        """
+                        SELECT 1 FROM StudentProject WHERE student_id = %s AND project_id = %s AND role = '负责人'
+                    """, (username, project_id))
+                    if not cursor.fetchone():
+                        return api_response(False, '无权申报该项目（非负责人）', status=403)
+
+                    cursor.execute("SET @current_user = %s", (username, ))
+                    cursor.execute("SET @current_role = %s", (full_role, ))
+                    cursor.execute("UPDATE Project SET project_application_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id, ))
+                    conn.commit()
+                    return api_response(True, '申报通过')
+
+                else:
+                    return api_response(False, '学生仅能在未申报状态执行操作', status=403)
+
             elif role == 'Teacher':
-                cursor.execute("SELECT name FROM Teacher WHERE teacher_id=%s", (username,))
-                role_label = '教职工'
+                cursor.execute("SELECT name FROM Teacher WHERE teacher_id = %s", (username, ))
+                row = cursor.fetchone()
+                if not row:
+                    return api_response(False, '教职工用户不存在', status=404)
+                full_role = f"教职工{row['name']}"
+
+                # 教师只能进行“审批”操作
+                if app_status == '申报通过' and aprv_status == '未审批':
+                    cursor.execute("""
+                        SELECT 1 FROM TeacherProject WHERE teacher_id = %s AND project_id = %s
+                    """, (username, project_id))
+                    if not cursor.fetchone():
+                        return api_response(False, '无权审批该项目（非指导教师）', status=403)
+
+                    cursor.execute("SET @current_user = %s", (username, ))
+                    cursor.execute("SET @current_role = %s", (full_role, ))
+                    cursor.execute("UPDATE Project SET project_approval_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id, ))
+                    conn.commit()
+                    return api_response(True, '审批通过')
+
+                else:
+                    return api_response(False, '教职工仅能在申报通过且未审批状态执行操作', status=403)
+
+            elif role == 'Admin':
+                # 管理员只能执行验收
+                if aprv_status == '审批通过' and accp_status == '未验收':
+                    full_role = f"管理员{username}"
+                    cursor.execute("SET @current_user = %s", (username, ))
+                    cursor.execute("SET @current_role = %s", (full_role, ))
+                    cursor.execute("UPDATE Project SET project_acceptance_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id, ))
+                    conn.commit()
+                    return api_response(True, '验收通过')
+                else:
+                    return api_response(False, '管理员仅能在审批通过且未验收状态操作', status=403)
+
             else:
-                return api_response(False, '管理员无需执行此操作', status=403)
-
-            row = cursor.fetchone()
-            if not row:
-                return api_response(False, '用户信息不存在', status=404)
-            full_role = f"{role_label}{row['name']}"
-
-            # 设置触发器上下文
-            cursor.execute("SET @current_user = %s", (username,))
-            cursor.execute("SET @current_role = %s", (full_role,))
-
-            # 根据操作字段更新
-            if action == 'application':
-                cursor.execute("UPDATE Project SET project_application_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id,))
-            elif action == 'approval':
-                cursor.execute("UPDATE Project SET project_approval_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id,))
-            elif action == 'acceptance':
-                cursor.execute("UPDATE Project SET project_acceptance_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id,))
-
-            conn.commit()
-            return api_response(True, '状态变更成功')
+                return api_response(False, '无权限角色', status=403)
 
         except Exception as e:
             conn.rollback()
-            return api_response(False, f'更新失败: {str(e)}', status=500)
+            return api_response(False, f'更新失败：{str(e)}', status=500)
         finally:
             cursor.close()
             conn.close()
