@@ -623,3 +623,65 @@ class DeleteData(Resource):
         finally:
             cursor.close()
             connection.close()
+
+
+@ns.route('/project/mark-status')
+class ProjectMarkStatus(Resource):
+    def post(self):
+        """
+        变更项目状态：申报 / 审批 / 验收
+        前端传入：
+        - project_id: 项目编号
+        - action: 'application' | 'approval' | 'acceptance'
+        - 自动根据当前用户身份写入 MySQL 会话变量，触发器完成拼接
+        """
+        user = request.user
+        username = user['username']
+        role = user['role']
+        data = request.json
+
+        project_id = data.get('project_id')
+        action = data.get('action')
+
+        if not project_id or action not in ('application', 'approval', 'acceptance'):
+            return api_response(False, '参数错误', status=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            # 获取用户姓名
+            if role == 'Student':
+                cursor.execute("SELECT name FROM Student WHERE student_id=%s", (username,))
+                role_label = '学生'
+            elif role == 'Teacher':
+                cursor.execute("SELECT name FROM Teacher WHERE teacher_id=%s", (username,))
+                role_label = '教职工'
+            else:
+                return api_response(False, '管理员无需执行此操作', status=403)
+
+            row = cursor.fetchone()
+            if not row:
+                return api_response(False, '用户信息不存在', status=404)
+            full_role = f"{role_label}{row['name']}"
+
+            # 设置触发器上下文
+            cursor.execute("SET @current_user = %s", (username,))
+            cursor.execute("SET @current_role = %s", (full_role,))
+
+            # 根据操作字段更新
+            if action == 'application':
+                cursor.execute("UPDATE Project SET project_application_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id,))
+            elif action == 'approval':
+                cursor.execute("UPDATE Project SET project_approval_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id,))
+            elif action == 'acceptance':
+                cursor.execute("UPDATE Project SET project_acceptance_status = 'TRIGGER_PENDING' WHERE project_id = %s", (project_id,))
+
+            conn.commit()
+            return api_response(True, '状态变更成功')
+
+        except Exception as e:
+            conn.rollback()
+            return api_response(False, f'更新失败: {str(e)}', status=500)
+        finally:
+            cursor.close()
+            conn.close()

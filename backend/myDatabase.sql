@@ -58,9 +58,9 @@ CREATE TABLE IF NOT EXISTS Project (
     project_id VARCHAR(50) PRIMARY KEY COMMENT '项目编号',
     project_name VARCHAR(255) NOT NULL COMMENT '项目名称',
     project_content TEXT COMMENT '项目内容',
-    project_application_status VARCHAR(100) DEFAULT '未申报',
-    project_approval_status VARCHAR(100) DEFAULT '未审批',
-    project_acceptance_status VARCHAR(100) DEFAULT '未验收'
+    project_application_status VARCHAR(255) DEFAULT '未申报',
+    project_approval_status VARCHAR(255) DEFAULT '未审批',
+    project_acceptance_status VARCHAR(255) DEFAULT '未验收'
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
@@ -199,38 +199,39 @@ LEFT JOIN ResearchFields rf ON trf.research_field = rf.id
 GROUP BY t.teacher_id;
 
 
--- 触发器：项目申报状态变更
+-- 申报触发器
 DELIMITER $$
 CREATE TRIGGER trg_project_application
 BEFORE UPDATE ON Project
 FOR EACH ROW
 BEGIN
-    IF NEW.project_application_status != OLD.project_application_status AND NEW.project_application_status IS NOT NULL THEN
-        SET NEW.project_application_status = CONCAT(@current_role, @current_user, '于', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i'), '申报通过');
+    IF NEW.project_application_status = 'TRIGGER_PENDING' THEN
+        SET NEW.project_application_status = CONCAT(@current_role, '(', @current_user, ')于', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i'), '申报通过');
     END IF;
 END$$
 DELIMITER ;
 
--- 触发器：项目审批状态变更
+-- 审批触发器
 DELIMITER $$
 CREATE TRIGGER trg_project_approval
 BEFORE UPDATE ON Project
 FOR EACH ROW
 BEGIN
-    IF NEW.project_approval_status != OLD.project_approval_status AND NEW.project_approval_status IS NOT NULL THEN
-        SET NEW.project_approval_status = CONCAT(@current_role, @current_user, '于', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i'), '审批通过');
+    IF NEW.project_approval_status = 'TRIGGER_PENDING' THEN
+        SET NEW.project_approval_status = CONCAT(@current_role, '(', @current_user, ')于', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i'), '审批通过');
     END IF;
 END$$
 DELIMITER ;
 
--- 触发器：项目验收状态变更
+-- 验收触发器
 DELIMITER $$
 CREATE TRIGGER trg_project_acceptance
 BEFORE UPDATE ON Project
 FOR EACH ROW
 BEGIN
-    IF NEW.project_acceptance_status != OLD.project_acceptance_status AND NEW.project_acceptance_status IS NOT NULL THEN
-        SET NEW.project_acceptance_status = CONCAT(@current_role, @current_user, '于', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i'), '验收通过');
+    IF NEW.project_acceptance_status = 'TRIGGER_PENDING' THEN
+        SET NEW.project_acceptance_status = CONCAT(@current_role, '(', @current_user, ')于', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i'), '验收通过');
     END IF;
 END$$
 DELIMITER ;
+
