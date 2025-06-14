@@ -118,3 +118,67 @@ class ChangePassword(Resource):
         finally:
             cursor.close()
             conn.close()
+
+
+@ns.route('/profile')
+class UserProfile(Resource):
+    """返回当前登录用户在数据库中的完整信息"""
+
+    def get(self):
+        # 获取并校验 JWT
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return api_response(False, '未提供有效的身份令牌', status=401)
+
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            username = payload.get('username')
+            role = payload.get('role')
+        except jwt.ExpiredSignatureError:
+            return api_response(False, '身份令牌已过期', status=401)
+        except jwt.InvalidTokenError:
+            return api_response(False, '无效身份令牌', status=401)
+
+        # Admin  直接返回空数据
+        if role == 'Admin':
+            return api_response(True, '查询成功', {'role': 'Admin', 'info': {}, 'research_fields': []})
+
+        # 学生 / 教职工  查询基本信息与研究领域
+        table = 'Student' if role == 'Student' else 'Teacher'
+        id_field = 'student_id' if role == 'Student' else 'teacher_id'
+        link_table = 'StudentResearchField' if role == 'Student' else 'TeacherResearchField'
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            # 基本信息
+            cursor.execute(f"SELECT * FROM {table} WHERE {id_field} = %s", (username, ))
+            base_info = cursor.fetchone()
+            if not base_info:
+                return api_response(False, '用户资料不存在', status=404)
+
+            # 研究领域名称列表
+            cursor.execute(
+                f"""
+                SELECT rf.research_field
+                FROM {link_table} lf
+                JOIN ResearchFields rf ON lf.research_field = rf.id
+                WHERE lf.{id_field} = %s
+            """, (username, ))
+            research_fields = [row['research_field'] for row in cursor.fetchall()]
+
+            return api_response(
+                True,
+                '查询成功',
+                {
+                    'role': role,
+                    'info': base_info,  # dict：学生/教师表全字段
+                    'research_fields': research_fields  # list[str]
+                })
+
+        except Exception as e:
+            return api_response(False, f'服务器错误: {str(e)}', status=500)
+        finally:
+            cursor.close()
+            conn.close()
