@@ -484,10 +484,10 @@ class EditData(Resource):
                     """
                     UPDATE Project SET
                         project_id=%s,
-                        name=%s,
+                        project_name=%s,
                         project_content=%s
                     WHERE project_id=%s
-                """, (new_key, record_data.get('name', ''), record_data.get('project_content', ''), old_key))
+                """, (new_key, record_data.get('project_name', ''), record_data.get('project_content', ''), old_key))
 
                 # 比对研究领域是否变更
                 cursor.execute("SELECT research_field FROM ProjectResearchField WHERE project_id=%s", (old_key, ))
