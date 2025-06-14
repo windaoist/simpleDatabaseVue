@@ -705,7 +705,7 @@ class ProjectMarkStatus(Resource):
                 full_role = f"教职工{row['name']}"
 
                 # 教师只能进行“审批”操作
-                if app_status in '申报通过' and aprv_status == '未审批':
+                if '申报通过' in app_status and aprv_status == '未审批':
                     cursor.execute("""
                         SELECT 1 FROM TeacherProject WHERE teacher_id = %s AND project_id = %s
                     """, (username, project_id))
@@ -723,7 +723,7 @@ class ProjectMarkStatus(Resource):
 
             elif role == 'Admin':
                 # 管理员只能执行验收
-                if aprv_status in '审批通过' and accp_status == '未验收':
+                if '审批通过' in aprv_status and accp_status == '未验收':
                     full_role = f"管理员{username}"
                     cursor.execute("SET @current_user = %s", (username, ))
                     cursor.execute("SET @current_role = %s", (full_role, ))
