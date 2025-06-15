@@ -229,3 +229,40 @@ class QueryResource(Resource):
         finally:
             cursor.close()
             conn.close()
+
+
+@query_ns.route('/statistics')
+class ProjectStatistics(Resource):
+    @query_ns.response(200, '统计成功', success_model)
+    @query_ns.response(500, '服务器错误', error_model)
+    @auth_required(roles=['Admin'])
+    def get(self):
+        """
+        按项目负责人专业统计科研项目各状态的通过数量
+        """
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                SELECT s.major AS 专业,
+                    SUM(CASE WHEN p.project_application_status LIKE '%申报通过' THEN 1 ELSE 0 END) AS 申报通过数,
+                    SUM(CASE WHEN p.project_approval_status LIKE '%审批通过' THEN 1 ELSE 0 END) AS 审批通过数,
+                    SUM(CASE WHEN p.project_acceptance_status LIKE '%验收通过' THEN 1 ELSE 0 END) AS 验收通过数
+                FROM Project p
+                JOIN StudentProject sp ON p.project_id = sp.project_id AND sp.role = '负责人'
+                JOIN Student s ON sp.student_id = s.student_id
+                GROUP BY s.major
+                ORDER BY s.major
+            """)
+            results = cursor.fetchall()
+
+            return api_response(True, '统计成功', {'results': results})
+
+        except Exception as e:
+            traceback.print_exc()
+            return api_response(False, f'服务器错误: {str(e)}', status=500)
+
+        finally:
+            cursor.close()
+            conn.close()
