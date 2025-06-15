@@ -41,7 +41,8 @@ const primaryKey = ref()
 const primaryLabel = ref()
 const dialogVisible = ref(false)
 const selectedRow = ref(null)
-
+const currentOp = ref('' as '提交申请' | '进行审批' | '验收项目')
+let role = ''
 function openEditDialog(row) {
   selectedRow.value = { ...row } // 深拷贝，避免原表数据污染
   dialogVisible.value = true
@@ -123,6 +124,16 @@ const onQuerySubmit = async () => {
     if (responseData.value.data.results.length > 0) {
       activeName.value = 'query-result' // 切换到查询结果标签
     }
+    if (queryForm.value.table === 'project') {
+      role = localStorage.getItem('current_role')
+      if (role === 'Student') {
+        currentOp.value = '提交申请'
+      } else if (role === 'Teacher') {
+        currentOp.value = '进行审批'
+      } else {
+        currentOp.value = '验收项目'
+      }
+    }
   } catch (error) {
     console.error('查询失败:', error)
     ElMessage.error(
@@ -131,9 +142,6 @@ const onQuerySubmit = async () => {
   }
 }
 
-// 编辑状态
-const editingId = ref(null)
-const originalData = ref()
 // 计算可编辑列（排除ID列），返回列名数组
 const editableColumns = computed(() => {
   if (!responseData.value.data.results.length) return []
@@ -142,26 +150,6 @@ const editableColumns = computed(() => {
     : Object.keys(responseData.value.data.results[0]).filter((k) => k !== '序号')
 })
 
-// // 检查行是否在编辑状态
-// const isEditing = (index) => {
-//   return editingId.value === index
-// }
-
-// // 处理编辑操作
-// const handleEdit = (row, index) => {
-//   // 保存原始数据（深拷贝）
-//   originalData.value = JSON.parse(JSON.stringify(row))
-//   // console.log('123', originalData.value[row.序号]);
-//   editingId.value = index
-// }
-
-// // 处理重置操作
-// const handleReset = (row) => {
-//   // 恢复原始数据
-//   Object.assign(row, originalData.value)
-//   editingId.value = null
-//   originalData.value = null
-// }
 // 处理提交操作
 async function handleSubmit(formData: { filters: any; memberList: any }) {
   try {
@@ -182,55 +170,74 @@ async function handleSubmit(formData: { filters: any; memberList: any }) {
     }
     const response = await request.post('add-edit/edit', payload)
     ElMessage.success('提交成功：' + response.data.message)
+    onQuerySubmit()
   } catch (error) {
     console.error('提交失败:', error)
     ElMessage.error('提交失败:' + error.response?.data?.message)
   }
-  // 清除编辑状态
-  editingId.value = null
-  // 移除备份数据
-  originalData.value = null
 }
 async function handleDelete(row) {
   try {
-    // 弹窗确认
+    // 弹窗确认（会在点击取消时抛出异常，直接跳到catch）
     await ElMessageBox.confirm('确定要删除这条数据吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning',
     })
-      .then(() => {
-        // 用户点击了确定
-        console.log('用户确认删除')
-      })
-      .catch(() => {
-        // 用户点击了取消
-        console.log('用户取消删除')
-        throw '取消' // 抛出异常以跳过后续操作
-      })
+
+    // 用户点击了确定
     const primary = row[primaryLabel.value]
     const payload = {
       table: queryForm.value.table,
       key: primary,
     }
+
     const response = await request.post('add-edit/delete', payload)
+
     responseData.value.data.results = responseData.value.data.results.filter(
       (item) => item[primaryLabel.value] !== primary,
     )
-    ElMessage.success((await response).data.message)
+
+    ElMessage.success(response.data.message)
+    onQuerySubmit()
   } catch (error) {
-    ElMessage.error('删除失败：' + error.response?.data?.message)
+    // 用户取消或其他异常
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除')
+    } else {
+      ElMessage.error('删除失败：' + (error.response?.data?.message || error.message))
+    }
   }
 }
-async function onDownload() {
+
+async function handleOperation(row) {
   try {
-    const response = await request.get('export/excel', {
-      params: {
-        // keyword1: queryForm.value.keyword1,
-        // keyword2: queryForm.value.keyword2,
-        table: queryForm.value.table,
-      },
-    })
+    const primary = primaryLabel.value
+    const payload = {
+      project_id: row[primary],
+    }
+    const response = await request.post('add-edit/mark-status', payload)
+    ElMessage.success(response.data.message)
+    onQuerySubmit()
+  } catch (error) {
+    ElMessage.error('操作失败：' + error.response?.data?.message)
+  }
+}
+function showOp(row): boolean {
+  if (role === 'Student') {
+    return row['申报状态'].includes('未申报')
+  } else if (role === 'Teacher') {
+    return row['申报状态'].includes('申报通过') && row['审批状态'].includes('未审批')
+  } else {
+    return row['审批状态'].includes('审批通过') && row['验收状态'].includes('未验收')
+  }
+}
+async function handleDownload() {
+  try {
+    const payload = {
+      data: responseData.value.data.results,
+    }
+    const response = await request.post('export/', payload)
     if (response.data.success) {
       const url = response.data.download_url
       console.log('下载链接:', url)
@@ -242,7 +249,7 @@ async function onDownload() {
       document.body.removeChild(link)
     }
   } catch (error) {
-    ElMessage.error('导出失败:' + error.message)
+    ElMessage.error('导出失败:' + error.response?.data?.message)
   }
 }
 
@@ -259,10 +266,6 @@ onMounted(() => {
   // 初始化行业列表
   fetchFields()
 })
-// 行样式（编辑状态背景色）
-// const getRowClassName = ({ row }) => {
-//   return isEditing(row) ? 'editing-row' : '';
-// };
 </script>
 <template>
   <div>
@@ -375,7 +378,7 @@ onMounted(() => {
           <el-button type="primary" @click="onQuerySubmit" class="submit-btn">查询</el-button>
           <el-button
             type="success"
-            @click="onDownload"
+            @click="handleDownload"
             :disabled="!responseData.data.results || responseData.data.results.length === 0"
             class="download-btn"
           >
@@ -405,8 +408,36 @@ onMounted(() => {
             <!-- 固定操作列 -->
             <el-table-column label="操作" fixed="right" width="180">
               <template #default="{ row }">
-                <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-                <el-button size="small" @click="handleDelete(row)">删除</el-button>
+                <!-- 添加 align-items: flex-start 确保左对齐 -->
+                <div
+                  style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start"
+                >
+                  <el-button
+                    size="small"
+                    type="primary"
+                    class="full-width-btn"
+                    @click="openEditDialog(row)"
+                  >
+                    编辑
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="danger"
+                    class="full-width-btn"
+                    @click="handleDelete(row)"
+                  >
+                    删除
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="success"
+                    v-if="queryForm.table === 'project' && row && showOp(row)"
+                    class="full-width-btn"
+                    @click="handleOperation(row)"
+                  >
+                    {{ currentOp }}
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -498,7 +529,11 @@ onMounted(() => {
 .el-form-item {
   margin-bottom: 18px;
 }
-
+.full-width-btn {
+  width: 80% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
 .el-form-item label {
   font-weight: 600;
   color: #606266;

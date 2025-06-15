@@ -32,6 +32,7 @@ async function handleLogin() {
     const response = await request.post('/auth/login', account.value)
     localStorage.setItem('jwt_token', response.data.data.token)
     localStorage.setItem('current_user', account.value.username)
+    localStorage.setItem('current_role', account.value.role)
     currentUser.value = account.value.username
     // LoggedIn.value = true
   } catch (error) {
@@ -50,6 +51,7 @@ async function handleLogout() {
     // await request.post('/auth/logout')
     localStorage.removeItem('jwt_token')
     localStorage.removeItem('current_user')
+    localStorage.removeItem('current_role')
     isLoggedIn.value = false
     currentUser.value = '游客'
     // LoggedIn.value = false
