@@ -24,8 +24,8 @@ class ManualBackup(Resource):
         """手动触发备份（仅限管理员）"""
         try:
             db_host = '127.0.0.1'
-            db_user = 'root'
-            db_password = 'root'
+            db_user = 'remoteuser'
+            db_password = 'password123'
             db_name = 'myDatabase'
 
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -76,7 +76,8 @@ class Restore(Resource):
             # subprocess.run(cmd, shell=True, check=True)
             with open(file_path, 'rb') as sql_file:
                 proc = subprocess.Popen(
-                    ['mysql', f'-h{db_host}', f'-u{db_user}', f'-p{db_password}', db_name],
+                    ['mysql', f'-h{db_host}', f'-u{db_user}',
+                        f'-p{db_password}', db_name],
                     stdin=sql_file,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
