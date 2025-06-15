@@ -19,7 +19,7 @@ def create_app():
     from app.add_edit import add_edit_bp, ns as add_edit_ns
     from app.export import export_bp, ns as export_ns
     from app.auth import auth_bp, ns as auth_ns
-    from app.backup import backup_bp, ns as backup_ns
+    from app.backup import backup_bp, backup_ns
 
     app.register_blueprint(main_bp)
     app.register_blueprint(query_bp)

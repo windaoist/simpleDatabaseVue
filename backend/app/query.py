@@ -233,6 +233,7 @@ class QueryResource(Resource):
 
 @query_ns.route('/statistics')
 class ProjectStatistics(Resource):
+
     @query_ns.response(200, '统计成功', success_model)
     @query_ns.response(500, '服务器错误', error_model)
     @auth_required(roles=['Admin'])
@@ -240,6 +241,18 @@ class ProjectStatistics(Resource):
         """
         按项目负责人专业统计科研项目各状态的通过数量
         """
+
+        # 十进制数转换函数
+        def convert_decimal_to_str(obj):
+            if isinstance(obj, list):
+                return [convert_decimal_to_str(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {k: convert_decimal_to_str(v) for k, v in obj.items()}
+            elif isinstance(obj, decimal.Decimal):
+                return str(obj)
+            else:
+                return obj
+
         conn = get_db_connection()
         cursor = conn.cursor()
 
@@ -256,8 +269,7 @@ class ProjectStatistics(Resource):
                 ORDER BY s.major
             """)
             results = cursor.fetchall()
-
-            return api_response(True, '统计成功', {'results': results})
+            return api_response(True, '统计成功', {'results': convert_decimal_to_str(results)})
 
         except Exception as e:
             traceback.print_exc()
