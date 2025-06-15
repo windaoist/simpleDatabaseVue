@@ -54,7 +54,7 @@ const visibleNavItems = computed(() => {
 .card-el-icon {
   width: 40px;
   height: 40px;
-  /* fill: currentColor;  // 如果图标颜色异常可加 */
+  color: white;
 }
 .operation-card {
   border-radius: 12px;
