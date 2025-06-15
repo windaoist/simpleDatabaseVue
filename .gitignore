@@ -12,3 +12,5 @@
 
 /backend/app/database.py
 /backend/app/db_backups
+
+/db_backups/
