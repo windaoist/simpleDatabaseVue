@@ -25,8 +25,6 @@ async function uploadFile(option) {
     }
     ElMessage.info('上传成功！')
   } catch (error) {
-    // console.error(error)
-    // onError(error)
     ElMessage.error('上传失败：' + error.response?.data?.message || '请稍后再试')
   }
 }

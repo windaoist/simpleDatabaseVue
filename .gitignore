@@ -11,3 +11,4 @@
 /backend/node_modules
 
 /backend/app/database.py
+/backend/app/db_backups
