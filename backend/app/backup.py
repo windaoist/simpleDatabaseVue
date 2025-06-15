@@ -50,6 +50,7 @@ class ManualBackup(Resource):
 @backup_ns.route('/restore')
 class Restore(Resource):
 
+    @backup_ns.expect(upload_parser)
     @auth_required(roles=['Admin'])
     def post(self):
         """上传 SQL 文件恢复数据库（仅限管理员）"""
@@ -71,8 +72,19 @@ class Restore(Resource):
             file_path = os.path.join(backup_dir, filename)
             file.save(file_path)
 
-            cmd = f"mysql -h{db_host} -u{db_user} -p{db_password} {db_name} < \"{file_path}\""
-            subprocess.run(cmd, shell=True, check=True)
+            # cmd = f"mysql -h{db_host} -u{db_user} -p{db_password} {db_name} < \"{file_path}\""
+            # subprocess.run(cmd, shell=True, check=True)
+            with open(file_path, 'rb') as sql_file:
+                proc = subprocess.Popen(
+                    ['mysql', f'-h{db_host}', f'-u{db_user}', f'-p{db_password}', db_name],
+                    stdin=sql_file,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                stdout, stderr = proc.communicate()
+
+                if proc.returncode != 0:
+                    return api_response(False, f"恢复失败（mysql错误）: {stderr.decode('utf-8')}", status=500)
 
             return api_response(True, '数据库恢复成功')
 
