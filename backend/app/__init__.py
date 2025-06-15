@@ -1,16 +1,16 @@
 from flask import Flask
 from flask_restx import Api
 from flask_cors import CORS
+from flask_apscheduler import APScheduler
+from app.backup import auto_backup_database
 import os
 
 
 def create_app():
     app = Flask(__name__)
     app.secret_key = os.urandom(24)
-    authorizations = {'Bearer Auth': {'type': 'apiKey', 'in': 'header',
-                                      'name': 'Authorization', 'description': '输入JWT Bearer令牌'}}
-    api = Api(app, version='1.0', title='Project API', description='本项目的API文档',
-              authorizations=authorizations, security='Bearer Auth', doc='/swagger/')
+    authorizations = {'Bearer Auth': {'type': 'apiKey', 'in': 'header', 'name': 'Authorization', 'description': '输入JWT Bearer令牌'}}
+    api = Api(app, version='1.0', title='Project API', description='本项目的API文档', authorizations=authorizations, security='Bearer Auth', doc='/swagger/')
 
     CORS(app, expose_headers=["Content-Disposition"])
 
@@ -38,5 +38,14 @@ def create_app():
     api.add_namespace(export_ns, path='/export')
     api.add_namespace(auth_ns, path='/auth')
     api.add_namespace(backup_ns, path='/backup')
+
+    scheduler = APScheduler()
+    scheduler.init_app(app)
+    scheduler.start()
+
+    @scheduler.task('interval', id='daily_auto_backup', hours=24)
+    def auto_task():
+        with app.app_context():
+            auto_backup_database(app.root_path)
 
     return app
