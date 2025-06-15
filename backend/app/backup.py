@@ -12,7 +12,8 @@ backup_ns = Namespace('backup', description='数据库备份与恢复接口')
 
 # 定义 Swagger 上传模型（手动支持文件上传）
 upload_parser = reqparse.RequestParser()
-upload_parser.add_argument('file', location='files', type='FileStorage', required=True, help='上传 .sql 数据库备份文件')
+upload_parser.add_argument('file', location='files',
+                           type='FileStorage', required=True, help='上传 .sql 数据库备份文件')
 
 
 @backup_ns.route('/backup')
@@ -58,8 +59,8 @@ class Restore(Resource):
 
         try:
             db_host = '127.0.0.1'
-            db_user = 'root'
-            db_password = 'root'
+            db_user = 'remoteuser'
+            db_password = 'password123'
             db_name = 'myDatabase'
 
             parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
@@ -86,8 +87,8 @@ def auto_backup_database(root_path=None):
     自动备份数据库（保留最近10个），不返回文件，而是仅执行备份
     """
     db_host = '127.0.0.1'
-    db_user = 'root'
-    db_password = 'root'
+    db_user = 'remoteuser'
+    db_password = 'password123'
     db_name = 'myDatabase'
 
     try:
@@ -102,7 +103,8 @@ def auto_backup_database(root_path=None):
         file_path = os.path.join(backup_dir, filename)
 
         # 控制最多保留10个备份
-        existing_backups = sorted([f for f in os.listdir(backup_dir) if f.startswith('auto_backup_') and f.endswith('.sql')])
+        existing_backups = sorted([f for f in os.listdir(
+            backup_dir) if f.startswith('auto_backup_') and f.endswith('.sql')])
         while len(existing_backups) >= 10:
             oldest = existing_backups.pop(0)
             os.remove(os.path.join(backup_dir, oldest))
