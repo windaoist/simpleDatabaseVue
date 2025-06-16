@@ -3,7 +3,7 @@ import pymysql
 sql_info = {
     'host': '127.0.0.1',
     'user': 'root',
-    'password': 'passwd',
+    'password': 'root',
     'db': 'myDatabase',
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor

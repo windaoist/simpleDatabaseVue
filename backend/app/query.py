@@ -256,12 +256,9 @@ class ProjectStatistics(Resource):
         cursor = conn.cursor()
 
         try:
-            # 调用存储过程
-            cursor.callproc('GetProjectStatisticsByMajor')
-
-            # MySQL中结果要用 nextset()
-            for result in cursor.stored_results():
-                data = result.fetchall()
+            # 执行 CALL
+            cursor.execute("CALL GetProjectStatisticsByMajor()")
+            data = cursor.fetchall()
 
             return api_response(True, '统计成功', {'results': convert_decimal_to_str(data)})
 
