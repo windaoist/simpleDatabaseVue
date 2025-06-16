@@ -14,3 +14,4 @@
 /backend/app/db_backups
 
 /backup/
+frontend/src/utils/request.ts

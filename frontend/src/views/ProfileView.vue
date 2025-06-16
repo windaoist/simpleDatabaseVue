@@ -3,7 +3,7 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import request from '@/utils/request'
 import * as echarts from 'echarts'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AddForm from '@/components/AddForm.vue'
 const profileInfo = ref({
   role: '' as 'Student' | 'Teacher' | 'Admin',
@@ -20,8 +20,11 @@ const passwdInfo = ref({
   new_password: '' as string,
   confirm_password: '' as string,
 })
-
-const statistics = ref([]) // 原为 undefined，改为 []
+const backupList = ref({
+  auto: [] as string[],
+  manual: [] as string[],
+})
+const statistics = ref([])
 async function getProfile() {
   try {
     const response = await request.get('auth/profile')
@@ -72,36 +75,6 @@ async function handleSubmit(formData: { filters: any; memberList: any }) {
     ElMessage.success('编辑成功：' + response.data.message)
   } catch (error) {
     ElMessage.error('编辑失败：' + error.response?.data?.message)
-  }
-}
-async function handleDownload() {
-  try {
-    const response = await request.get('backup/backup', { responseType: 'blob' })
-
-    ElMessage.success('备份成功，正在下载...')
-
-    // 获取响应头中的 content-disposition
-    const disposition = response.headers['content-disposition']
-    let filename = 'backup.sql' // 默认文件名
-
-    if (disposition && disposition.includes('filename=')) {
-      const match = disposition.match(/filename="?(.+?)"?$/)
-      if (match && match[1]) {
-        filename = decodeURIComponent(match[1])
-      }
-    }
-
-    const blob = response.data
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-
-    // 释放 URL 对象
-    window.URL.revokeObjectURL(url)
-  } catch (error) {
-    ElMessage.error('备份失败:' + error.response?.data?.message)
   }
 }
 async function handleUpload(option) {
@@ -249,7 +222,125 @@ function renderChart(data: any[]) {
     }
   }
 }
+async function fetchBackupList() {
+  try {
+    const response = await request.get('backup/list')
+    backupList.value = response.data.data
+  } catch (error) {
+    ElMessage.error('获取备份文件失败：' + error.response?.data?.message)
+  }
+}
+async function handleManualBackup() {
+  try {
+    const response = await request.get('backup/backup', {
+      responseType: 'blob',
+    })
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
 
+    const a = document.createElement('a')
+    a.href = url
+
+    // 尝试从响应头中提取文件名
+    const contentDisposition = response.headers['content-disposition']
+    let fileName = 'downloaded_file.sql'
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/)
+      if (match) {
+        fileName = decodeURIComponent(match[1])
+      }
+    }
+
+    a.download = fileName
+    a.click()
+
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('下载成功')
+    fetchBackupList()
+  } catch (error) {
+    ElMessage.error('获取备份文件失败：' + error.response?.data?.message)
+  }
+}
+
+async function restoreBackup(filename: string, source: string) {
+  try {
+    const response = await request.get('backup/restore_file', {
+      params: {
+        source: source,
+        filename: filename,
+      },
+    })
+    if (response.data.success) {
+      ElMessage.success('备份恢复成功')
+    } else {
+      ElMessage.success('备份恢复失败，请稍后再试')
+    }
+  } catch (error) {
+    ElMessage.error('获取备份文件失败：' + error.response?.data?.message)
+  }
+}
+async function downloadBackup(filename: string, source: string) {
+  try {
+    const response = await request.get('backup/download_file', {
+      responseType: 'blob',
+      params: {
+        source: source,
+        filename: filename,
+      },
+    })
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
+
+    const a = document.createElement('a')
+    a.href = url
+
+    // 尝试从响应头中提取文件名
+    const contentDisposition = response.headers['content-disposition']
+    let fileName = 'downloaded_file.sql'
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/)
+      if (match) {
+        fileName = decodeURIComponent(match[1])
+      }
+    }
+
+    a.download = fileName
+    a.click()
+
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('下载成功')
+  } catch (error) {
+    ElMessage.error('获取备份文件失败：' + error.response?.data?.message)
+  }
+}
+async function deleteBackup(filename: string, source: string) {
+  try {
+    await ElMessageBox.confirm('确定要删除这条数据吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    const response = await request.delete('backup/delete_file', {
+      params: {
+        source: source,
+        filename: filename,
+      },
+    })
+    if (response.data.success) {
+      ElMessage.success('备份删除成功')
+      fetchBackupList()
+    } else {
+      ElMessage.success('备份删除失败，请稍后再试')
+    }
+  } catch (error) {
+    // 用户取消或其他异常
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除')
+    } else {
+      ElMessage.error('删除失败：' + (error.response?.data?.message || error.message))
+    }
+  }
+}
 // 监听 activeTab 和 statistics，切换到 statistics 且有数据时自动渲染图表
 watch([activeTab, statistics], async ([tab, stats]) => {
   if (tab === 'statistics' && stats && stats.length) {
@@ -368,30 +459,70 @@ onMounted(() => {
             <span>数据管理</span>
           </template>
 
-          <div class="data-button">
-            <!-- 备份按钮 -->
-            <el-button
-              size="large"
-              style="width: 400px"
-              type="primary"
-              icon="Download"
-              @click="handleDownload"
-            >
-              数据备份
-            </el-button>
+          <el-card>
+            <div style="display: flex; gap: 20px">
+              <el-button type="primary" style="width: 200px" @click="handleManualBackup"
+                >手动备份</el-button
+              >
+              <el-upload
+                class="upload"
+                action=""
+                style="width: 200px"
+                :limit="1"
+                :http-request="handleUpload"
+                :before-upload="beforeUpload"
+              >
+                <el-button type="success" style="width: 200px" icon="Upload">上传备份</el-button>
+              </el-upload>
+            </div>
+            <template #header>手动备份</template>
+            <el-table :data="backupList.manual" border style="width: 100%">
+              <el-table-column label="文件名" prop="filename">
+                <template #default="scope">
+                  {{ scope.row }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="250">
+                <template #default="scope">
+                  <el-button size="small" @click="restoreBackup(scope.row, 'manual')"
+                    >恢复</el-button
+                  >
+                  <el-button size="small" @click="downloadBackup(scope.row, 'manual')"
+                    >下载</el-button
+                  >
+                  <el-button size="small" type="danger" @click="deleteBackup(scope.row, 'manual')"
+                    >删除</el-button
+                  >
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+          <el-card class="mb-4">
+            <template #header>自动备份</template>
+            <el-table :data="backupList.auto" border style="width: 100%">
+              <el-table-column label="文件名" prop="filename">
+                <template #default="scope">
+                  {{ scope.row }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="250">
+                <template #default="scope">
+                  <el-button size="small" @click="restoreBackup(scope.row, 'auto')">恢复</el-button>
+                  <el-button size="small" @click="downloadBackup(scope.row, 'auto')"
+                    >下载</el-button
+                  >
+                  <el-button size="small" type="danger" @click="deleteBackup(scope.row, 'auto')"
+                    >删除</el-button
+                  >
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
 
-            <!-- 恢复按钮 -->
-            <el-upload
-              class="upload"
-              drag
-              style="width: 100%"
-              action=""
-              :http-request="handleUpload"
-              :before-upload="beforeUpload"
-            >
-              <el-button type="success" icon="Upload">数据恢复</el-button>
-            </el-upload>
-          </div>
+          <!-- </el-tab-pane>
+            </el-tabs>
+          </div> -->
+          <el-button @click="fetchBackupList()">获取备份数据</el-button>
         </el-card>
       </div>
       <div v-if="activeTab === 'password'">
