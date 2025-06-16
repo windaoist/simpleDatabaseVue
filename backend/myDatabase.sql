@@ -253,3 +253,26 @@ BEGIN
 END //
 
 DELIMITER ;
+
+-- Student 表索引
+CREATE INDEX idx_student_name ON Student(name);
+CREATE INDEX idx_student_grade ON Student(grade);
+CREATE INDEX idx_student_major ON Student(major);
+CREATE INDEX idx_student_class ON Student(class);
+CREATE INDEX idx_student_email ON Student(email);
+CREATE INDEX idx_student_phone ON Student(phone);
+
+-- Teacher 表索引
+CREATE INDEX idx_teacher_name ON Teacher(name);
+CREATE INDEX idx_teacher_title ON Teacher(title);
+CREATE INDEX idx_teacher_college ON Teacher(college);
+CREATE INDEX idx_teacher_department ON Teacher(department);
+CREATE INDEX idx_teacher_email ON Teacher(email);
+CREATE INDEX idx_teacher_phone ON Teacher(phone);
+CREATE INDEX idx_teacher_office_location ON Teacher(office_location);
+
+-- Project 表索引
+CREATE INDEX idx_project_name ON Project(project_name);
+CREATE INDEX idx_project_application_status ON Project(project_application_status);
+CREATE INDEX idx_project_approval_status ON Project(project_approval_status);
+CREATE INDEX idx_project_acceptance_status ON Project(project_acceptance_status);
