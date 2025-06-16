@@ -235,3 +235,21 @@ BEGIN
 END$$
 DELIMITER ;
 
+-- 统计的存储过程
+DELIMITER //
+
+CREATE PROCEDURE GetProjectStatisticsByMajor()
+BEGIN
+    SELECT 
+        s.major AS 专业,
+        SUM(CASE WHEN p.project_application_status LIKE '%申报通过' THEN 1 ELSE 0 END) AS 申报通过数,
+        SUM(CASE WHEN p.project_approval_status LIKE '%审批通过' THEN 1 ELSE 0 END) AS 审批通过数,
+        SUM(CASE WHEN p.project_acceptance_status LIKE '%验收通过' THEN 1 ELSE 0 END) AS 验收通过数
+    FROM Project p
+    JOIN StudentProject sp ON p.project_id = sp.project_id AND sp.role = '负责人'
+    JOIN Student s ON sp.student_id = s.student_id
+    GROUP BY s.major
+    ORDER BY s.major;
+END //
+
+DELIMITER ;

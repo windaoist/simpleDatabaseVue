@@ -239,10 +239,9 @@ class ProjectStatistics(Resource):
     @auth_required(roles=['Admin'])
     def get(self):
         """
-        按项目负责人专业统计科研项目各状态的通过数量
+        按项目负责人专业统计科研项目各状态的通过数量（使用存储过程）
         """
 
-        # 十进制数转换函数
         def convert_decimal_to_str(obj):
             if isinstance(obj, list):
                 return [convert_decimal_to_str(item) for item in obj]
@@ -257,19 +256,14 @@ class ProjectStatistics(Resource):
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
-                SELECT s.major AS 专业,
-                    SUM(CASE WHEN p.project_application_status LIKE '%申报通过' THEN 1 ELSE 0 END) AS 申报通过数,
-                    SUM(CASE WHEN p.project_approval_status LIKE '%审批通过' THEN 1 ELSE 0 END) AS 审批通过数,
-                    SUM(CASE WHEN p.project_acceptance_status LIKE '%验收通过' THEN 1 ELSE 0 END) AS 验收通过数
-                FROM Project p
-                JOIN StudentProject sp ON p.project_id = sp.project_id AND sp.role = '负责人'
-                JOIN Student s ON sp.student_id = s.student_id
-                GROUP BY s.major
-                ORDER BY s.major
-            """)
-            results = cursor.fetchall()
-            return api_response(True, '统计成功', {'results': convert_decimal_to_str(results)})
+            # 调用存储过程
+            cursor.callproc('GetProjectStatisticsByMajor')
+
+            # MySQL中结果要用 nextset()
+            for result in cursor.stored_results():
+                data = result.fetchall()
+
+            return api_response(True, '统计成功', {'results': convert_decimal_to_str(data)})
 
         except Exception as e:
             traceback.print_exc()
