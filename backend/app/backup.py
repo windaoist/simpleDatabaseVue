@@ -3,6 +3,7 @@ import subprocess
 from datetime import datetime
 from flask import Blueprint, request, send_file
 from flask_restx import Namespace, Resource, reqparse, fields
+import ipdb
 from app.utils import auth_required, api_response
 from app.database import sql_info
 
@@ -186,9 +187,19 @@ class ManualBackup(Resource):
             backup_dir = os.path.join(project_root, 'backup', 'manual')
             os.makedirs(backup_dir, exist_ok=True)
             file_path = os.path.join(backup_dir, filename)
+            ipdb.set_trace()
 
-            cmd = f"mysqldump -h{db_host} -u{db_user} -p{db_password} {db_name} > \"{file_path}\""
-            subprocess.run(cmd, shell=True, check=True)
+            cmd = [
+                r"C:\Program Files\MySQL\MySQL Server 9.2\bin\mysqldump.exe",
+                f"-h{db_host}",
+                f"-u{db_user}",
+                f"-p{db_password}",
+                db_name,
+            ]
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                subprocess.run(
+                    cmd, stdout=f, stderr=subprocess.PIPE, check=True)
 
             return send_file(file_path, as_attachment=True)
         except subprocess.CalledProcessError as e:
@@ -224,8 +235,7 @@ class RestoreFromUpload(Resource):
 
             filepath = os.path.join(upload_dir, file.filename)
             file.save(filepath)
-            # cmd = f"mysql -h{db_host} -u{db_user} -p{db_password} {db_name} < \"{file_path}\""
-            # subprocess.run(cmd, shell=True, check=True)
+
             with open(filepath, 'rb') as sql_file:
                 proc = subprocess.Popen(
                     ['mysql', f'-h{db_host}', f'-u{db_user}',
@@ -279,8 +289,16 @@ def auto_backup_database(root_path=None):
             oldest = existing_backups.pop(0)
             os.remove(os.path.join(backup_dir, oldest))
 
-        cmd = f"mysqldump -h{db_host} -u{db_user} -p{db_password} {db_name} > \"{file_path}\""
-        subprocess.run(cmd, shell=True, check=True)
+        cmd = [
+            r"C:\Program Files\MySQL\MySQL Server 9.2\bin\mysqldump.exe",
+            f"-h{db_host}",
+            f"-u{db_user}",
+            f"-p{db_password}",
+            db_name,
+        ]
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            subprocess.run(cmd, stdout=f, stderr=subprocess.PIPE, check=True)
 
         print(f"[Auto Backup] 成功备份数据库至: {file_path}")
     except Exception as e:
