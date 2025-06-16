@@ -4,6 +4,7 @@ from datetime import datetime
 from flask import Blueprint, request, send_file
 from flask_restx import Namespace, Resource, reqparse, fields
 from app.utils import auth_required, api_response
+from app.database import sql_info
 
 # Blueprint + Namespace 注册
 backup_bp = Blueprint('backup_bp', __name__)
@@ -16,7 +17,8 @@ success_model = backup_ns.model('SuccessResponse', {
     'data': fields.Raw(description='响应数据内容，如备份文件列表或空')
 })
 
-error_model = backup_ns.model('ErrorResponse', {'success': fields.Boolean(example=False), 'message': fields.String(description='错误信息')})
+error_model = backup_ns.model('ErrorResponse', {'success': fields.Boolean(
+    example=False), 'message': fields.String(description='错误信息')})
 
 # 上传文件解析器
 upload_parser = reqparse.RequestParser()
@@ -25,8 +27,10 @@ upload_parser.add_argument('file', location='files',
 
 # 查询参数解析器（restore/download/delete）
 restore_query_model = backup_ns.parser()
-restore_query_model.add_argument('source', type=str, required=True, choices=['auto', 'manual'], help='备份来源')
-restore_query_model.add_argument('filename', type=str, required=True, help='.sql 文件名')
+restore_query_model.add_argument('source', type=str, required=True, choices=[
+                                 'auto', 'manual'], help='备份来源')
+restore_query_model.add_argument(
+    'filename', type=str, required=True, help='.sql 文件名')
 
 
 @backup_ns.route('/list')
@@ -38,12 +42,15 @@ class BackupFileList(Resource):
     @auth_required(roles=['Admin'])
     def get(self):
         try:
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            project_root = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', '..'))
             auto_dir = os.path.join(project_root, 'backup', 'auto')
             manual_dir = os.path.join(project_root, 'backup', 'manual')
 
-            auto_files = sorted(f for f in os.listdir(auto_dir) if f.endswith('.sql')) if os.path.exists(auto_dir) else []
-            manual_files = sorted(f for f in os.listdir(manual_dir) if f.endswith('.sql')) if os.path.exists(manual_dir) else []
+            auto_files = sorted(f for f in os.listdir(auto_dir) if f.endswith(
+                '.sql')) if os.path.exists(auto_dir) else []
+            manual_files = sorted(f for f in os.listdir(manual_dir) if f.endswith(
+                '.sql')) if os.path.exists(manual_dir) else []
 
             return api_response(True, '获取成功', data={'auto': auto_files, 'manual': manual_files})
         except Exception as e:
@@ -68,16 +75,17 @@ class RestoreFromFile(Resource):
             return api_response(False, '参数错误，请提供正确的 source 和 .sql 文件名', status=400)
 
         try:
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            project_root = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', '..'))
             file_path = os.path.join(project_root, 'backup', source, filename)
 
             if not os.path.exists(file_path):
                 return api_response(False, '文件不存在', status=404)
 
-            db_host = '127.0.0.1'
-            db_user = 'root'
-            db_password = 'root'
-            db_name = 'myDatabase'
+            db_host = sql_info['host']
+            db_user = sql_info['user']
+            db_password = sql_info['password']
+            db_name = sql_info['db']
 
             with open(file_path, 'rb') as sql_file:
                 proc = subprocess.Popen(['mysql', f'-h{db_host}', f'-u{db_user}', f'-p{db_password}', db_name],
@@ -113,7 +121,8 @@ class DownloadBackupFile(Resource):
             return api_response(False, '参数错误', status=400)
 
         try:
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            project_root = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', '..'))
             file_path = os.path.join(project_root, 'backup', source, filename)
 
             if not os.path.exists(file_path):
@@ -142,7 +151,8 @@ class DeleteBackupFile(Resource):
             return api_response(False, '参数错误', status=400)
 
         try:
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            project_root = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', '..'))
             file_path = os.path.join(project_root, 'backup', source, filename)
 
             if not os.path.exists(file_path):
@@ -163,15 +173,16 @@ class ManualBackup(Resource):
     @auth_required(roles=['Admin'])
     def get(self):
         try:
-            db_host = '127.0.0.1'
-            db_user = 'remoteuser'
-            db_password = 'password123'
-            db_name = 'myDatabase'
+            db_host = sql_info['host']
+            db_user = sql_info['user']
+            db_password = sql_info['password']
+            db_name = sql_info['db']
 
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"manual_backup_{timestamp}.sql"
 
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            project_root = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', '..'))
             backup_dir = os.path.join(project_root, 'backup', 'manual')
             os.makedirs(backup_dir, exist_ok=True)
             file_path = os.path.join(backup_dir, filename)
@@ -201,12 +212,13 @@ class RestoreFromUpload(Resource):
             return api_response(False, '请上传 .sql 格式的数据库备份文件', status=400)
 
         try:
-            db_host = '127.0.0.1'
-            db_user = 'remoteuser'
-            db_password = 'password123'
-            db_name = 'myDatabase'
+            db_host = sql_info['host']
+            db_user = sql_info['user']
+            db_password = sql_info['password']
+            db_name = sql_info['db']
 
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            project_root = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', '..'))
             upload_dir = os.path.join(project_root, 'backup', 'upload')
             os.makedirs(upload_dir, exist_ok=True)
 
@@ -214,7 +226,7 @@ class RestoreFromUpload(Resource):
             file.save(filepath)
             # cmd = f"mysql -h{db_host} -u{db_user} -p{db_password} {db_name} < \"{file_path}\""
             # subprocess.run(cmd, shell=True, check=True)
-            with open(file_path, 'rb') as sql_file:
+            with open(filepath, 'rb') as sql_file:
                 proc = subprocess.Popen(
                     ['mysql', f'-h{db_host}', f'-u{db_user}',
                         f'-p{db_password}', db_name],
@@ -239,22 +251,24 @@ class RestoreFromUpload(Resource):
 
 
 def auto_backup_database(root_path=None):
-    db_host = '127.0.0.1'
-    db_user = 'remoteuser'
-    db_password = 'password123'
-    db_name = 'myDatabase'
+    db_host = sql_info['host']
+    db_user = sql_info['user']
+    db_password = sql_info['password']
+    db_name = sql_info['db']
 
     try:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"auto_backup_{timestamp}.sql"
 
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        project_root = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), '..', '..'))
         backup_dir = os.path.join(project_root, 'backup', 'auto')
         os.makedirs(backup_dir, exist_ok=True)
         file_path = os.path.join(backup_dir, filename)
 
         # 删除旧文件，保留10个
-        backups = sorted([f for f in os.listdir(backup_dir) if f.endswith('.sql')])
+        backups = sorted([f for f in os.listdir(
+            backup_dir) if f.endswith('.sql')])
         while len(backups) >= 10:
             os.remove(os.path.join(backup_dir, backups.pop(0)))
 
