@@ -2,7 +2,7 @@
 import axios from 'axios'
 
 const request = axios.create({
-  baseURL: 'http://127.0.0.1:5000/', // 默认请求地址
+  baseURL: 'http://47.111.154.156:5000/', // 默认请求地址
   timeout: 5000,
 })
 // 请求拦截器：自动添加 Token 到请求头

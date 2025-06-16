@@ -20,7 +20,8 @@ error_model = backup_ns.model('ErrorResponse', {'success': fields.Boolean(exampl
 
 # 上传文件解析器
 upload_parser = reqparse.RequestParser()
-upload_parser.add_argument('file', location='files', type='FileStorage', required=True, help='上传 .sql 数据库备份文件')
+upload_parser.add_argument('file', location='files',
+                           type='FileStorage', required=True, help='上传 .sql 数据库备份文件')
 
 # 查询参数解析器（restore/download/delete）
 restore_query_model = backup_ns.parser()
@@ -163,8 +164,8 @@ class ManualBackup(Resource):
     def get(self):
         try:
             db_host = '127.0.0.1'
-            db_user = 'root'
-            db_password = 'root'
+            db_user = 'remoteuser'
+            db_password = 'password123'
             db_name = 'myDatabase'
 
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -201,8 +202,8 @@ class RestoreFromUpload(Resource):
 
         try:
             db_host = '127.0.0.1'
-            db_user = 'root'
-            db_password = 'root'
+            db_user = 'remoteuser'
+            db_password = 'password123'
             db_name = 'myDatabase'
 
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -211,6 +212,17 @@ class RestoreFromUpload(Resource):
 
             filepath = os.path.join(upload_dir, file.filename)
             file.save(filepath)
+            # cmd = f"mysql -h{db_host} -u{db_user} -p{db_password} {db_name} < \"{file_path}\""
+            # subprocess.run(cmd, shell=True, check=True)
+            with open(file_path, 'rb') as sql_file:
+                proc = subprocess.Popen(
+                    ['mysql', f'-h{db_host}', f'-u{db_user}',
+                        f'-p{db_password}', db_name],
+                    stdin=sql_file,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                stdout, stderr = proc.communicate()
 
             with open(filepath, 'rb') as sql_file:
                 proc = subprocess.Popen(['mysql', f'-h{db_host}', f'-u{db_user}', f'-p{db_password}', db_name],
@@ -228,8 +240,8 @@ class RestoreFromUpload(Resource):
 
 def auto_backup_database(root_path=None):
     db_host = '127.0.0.1'
-    db_user = 'root'
-    db_password = 'root'
+    db_user = 'remoteuser'
+    db_password = 'password123'
     db_name = 'myDatabase'
 
     try:
@@ -245,6 +257,13 @@ def auto_backup_database(root_path=None):
         backups = sorted([f for f in os.listdir(backup_dir) if f.endswith('.sql')])
         while len(backups) >= 10:
             os.remove(os.path.join(backup_dir, backups.pop(0)))
+
+        # 控制最多保留10个备份
+        existing_backups = sorted([f for f in os.listdir(
+            backup_dir) if f.startswith('auto_backup_') and f.endswith('.sql')])
+        while len(existing_backups) >= 10:
+            oldest = existing_backups.pop(0)
+            os.remove(os.path.join(backup_dir, oldest))
 
         cmd = f"mysqldump -h{db_host} -u{db_user} -p{db_password} {db_name} > \"{file_path}\""
         subprocess.run(cmd, shell=True, check=True)
