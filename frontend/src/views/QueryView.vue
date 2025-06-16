@@ -126,9 +126,9 @@ const onQuerySubmit = async () => {
     }
     if (queryForm.value.table === 'project') {
       role = localStorage.getItem('current_role')
-      if (role === 'Student') {
+      if (role === 'student') {
         currentOp.value = '提交申请'
-      } else if (role === 'Teacher') {
+      } else if (role === 'teacher') {
         currentOp.value = '进行审批'
       } else {
         currentOp.value = '验收项目'
@@ -224,9 +224,9 @@ async function handleOperation(row) {
   }
 }
 function showOp(row): boolean {
-  if (role === 'Student') {
+  if (role === 'student') {
     return row['申报状态'].includes('未申报')
-  } else if (role === 'Teacher') {
+  } else if (role === 'teacher') {
     return row['申报状态'].includes('申报通过') && row['审批状态'].includes('未审批')
   } else {
     return row['审批状态'].includes('审批通过') && row['验收状态'].includes('未验收')

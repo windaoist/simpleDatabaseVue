@@ -12,8 +12,8 @@ const navItems = [
 ]
 const roles = [
   { name: '管理员', value: 'Admin' },
-  { name: '教职工', value: 'Teacher' },
-  { name: '学生', value: 'Student' },
+  { name: '教职工', value: 'teacher' },
+  { name: '学生', value: 'student' },
 ]
 const loginDialogVisible = ref(false)
 const currentUser = ref()

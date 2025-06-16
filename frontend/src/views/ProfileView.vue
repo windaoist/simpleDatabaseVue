@@ -6,7 +6,7 @@ import * as echarts from 'echarts'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AddForm from '@/components/AddForm.vue'
 const profileInfo = ref({
-  role: '' as 'Student' | 'Teacher' | 'Admin',
+  role: '' as 'student' | 'teacher' | 'Admin',
   info: {} as Record<string, string>,
   research_fields: [] as string[],
 })
@@ -40,12 +40,12 @@ async function getProfile() {
 }
 function getBasicInfo() {
   const info = []
-  if (profileInfo.value.role === 'Student') {
+  if (profileInfo.value.role === 'student') {
     info.push('学生')
     info.push(profileInfo.value.info['student_id'])
     info.push(profileInfo.value.info['name'])
     currentTable.value = 'student'
-  } else if (profileInfo.value.role === 'Teacher') {
+  } else if (profileInfo.value.role === 'teacher') {
     info.push('教职工')
     info.push(profileInfo.value.info['teacher_id'])
     info.push(profileInfo.value.info['name'])
@@ -369,7 +369,7 @@ onMounted(() => {
   <div>
     <div v-if="profileInfo.role">
       <div class="basic">
-        <h3 v-if="profileInfo.role === 'Student' || profileInfo.role === 'Teacher'">
+        <h3 v-if="profileInfo.role === 'student' || profileInfo.role === 'teacher'">
           欢迎，{{ BasicInfo[0] }}{{ BasicInfo[1] }}{{ BasicInfo[2] }}
         </h3>
         <h3 v-else>欢迎，{{ BasicInfo[0] }}</h3>
@@ -385,7 +385,7 @@ onMounted(() => {
             @click="activeTab = 'edit'"
             size="large"
             round
-            v-if="profileInfo.role === 'Student' || profileInfo.role === 'Teacher'"
+            v-if="profileInfo.role === 'student' || profileInfo.role === 'teacher'"
           >
             编辑信息
           </el-button>
@@ -421,7 +421,7 @@ onMounted(() => {
       <!-- 内容区域 -->
       <div
         v-show="activeTab === 'edit'"
-        v-if="profileInfo.role === 'Student' || profileInfo.role === 'Teacher'"
+        v-if="profileInfo.role === 'student' || profileInfo.role === 'teacher'"
       >
         <AddForm
           :current-table="currentTable"
