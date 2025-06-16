@@ -25,7 +25,7 @@ login_model = ns.model(
     'LoginRequest', {
         'username': fields.String(required=True, description='用户名'),
         'password': fields.String(required=True, description='密码'),
-        'role': fields.String(required=True, enum=['Admin', 'Teacher', 'Student'], description='用户角色')
+        'role': fields.String(required=True, enum=['Admin', 'teacher', 'student'], description='用户角色')
     })
 
 change_password_model = ns.model(
@@ -55,13 +55,13 @@ class Login(Resource):
 
             # 若不存在，添加 Admin 账号
             if role == 'Admin' and username == 'Admin':
-                cursor.execute("SELECT * FROM Users WHERE username = %s AND role = %s", ('Admin', 'Admin'))
+                cursor.execute("SELECT * FROM users WHERE username = %s AND role = %s", ('Admin', 'Admin'))
                 if not cursor.fetchone():
-                    cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, %s)", ('Admin', 'Admin', 'Admin'))
+                    cursor.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)", ('Admin', 'Admin', 'Admin'))
                     connection.commit()
 
             # 查询用户信息
-            cursor.execute("SELECT * FROM Users WHERE username = %s AND role = %s", (username, role))
+            cursor.execute("SELECT * FROM users WHERE username = %s AND role = %s", (username, role))
             user = cursor.fetchone()
 
             if not user:
@@ -100,7 +100,7 @@ class ChangePassword(Resource):
         conn = get_db_connection()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT password FROM Users WHERE username = %s", (username, ))
+            cursor.execute("SELECT password FROM users WHERE username = %s", (username, ))
             row = cursor.fetchone()
             if not row:
                 return api_response(False, '用户不存在', status=404)
@@ -108,7 +108,7 @@ class ChangePassword(Resource):
             if row['password'] != old_password:
                 return api_response(False, '原密码错误', status=401)
 
-            cursor.execute("UPDATE Users SET password = %s WHERE username = %s", (new_password, username))
+            cursor.execute("UPDATE users SET password = %s WHERE username = %s", (new_password, username))
             conn.commit()
             return api_response(True, '密码修改成功')
 
@@ -145,9 +145,9 @@ class UserProfile(Resource):
             return api_response(True, '查询成功', {'role': 'Admin', 'info': {}, 'research_fields': []})
 
         # 学生 / 教职工  查询基本信息与研究领域
-        table = 'Student' if role == 'Student' else 'Teacher'
-        id_field = 'student_id' if role == 'Student' else 'teacher_id'
-        link_table = 'StudentResearchField' if role == 'Student' else 'TeacherResearchField'
+        table = 'student' if role == 'student' else 'teacher'
+        id_field = 'student_id' if role == 'student' else 'teacher_id'
+        link_table = 'studentresearchfield' if role == 'student' else 'teacherresearchfield'
 
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -163,7 +163,7 @@ class UserProfile(Resource):
                 f"""
                 SELECT rf.research_field
                 FROM {link_table} lf
-                JOIN ResearchFields rf ON lf.research_field = rf.id
+                JOIN researchfields rf ON lf.research_field = rf.id
                 WHERE lf.{id_field} = %s
             """, (username, ))
             research_fields = [row['research_field'] for row in cursor.fetchall()]

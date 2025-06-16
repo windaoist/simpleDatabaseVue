@@ -10,7 +10,7 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = os.urandom(24)
     authorizations = {'Bearer Auth': {'type': 'apiKey', 'in': 'header', 'name': 'Authorization', 'description': '输入JWT Bearer令牌'}}
-    api = Api(app, version='1.0', title='Project API', description='本项目的API文档', authorizations=authorizations, security='Bearer Auth', doc='/swagger/')
+    api = Api(app, version='1.0', title='project API', description='本项目的API文档', authorizations=authorizations, security='Bearer Auth', doc='/swagger/')
 
     CORS(app, expose_headers=["Content-Disposition"])
 

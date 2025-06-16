@@ -20,7 +20,7 @@ error_model = query_ns.model('ErrorResponse', {'success': fields.Boolean(default
 # 请求参数定义
 query_model = query_ns.model(
     'QueryRequest', {
-        'table': fields.String(required=True, description='查询的目标表', enum=['Student', 'Teacher', 'Project'], example='Student'),
+        'table': fields.String(required=True, description='查询的目标表', enum=['student', 'teacher', 'project'], example='student'),
         'filters': fields.Raw(required=False, description='字段过滤条件（动态键值对）', example={
             'name': '张三',
             'gender': '男'
@@ -64,7 +64,7 @@ class QueryResource(Resource):
     @query_ns.response(400, '参数错误', error_model)
     @query_ns.response(403, '权限不足')
     @query_ns.response(500, '服务器错误', error_model)
-    @auth_required(roles=['Admin', 'Teacher', 'Student'])
+    @auth_required(roles=['Admin', 'teacher', 'student'])
     def post(self):
         """支持字段字典模糊查询 + 多研究领域筛选 + 权限控制"""
         data = request.get_json()
@@ -81,8 +81,8 @@ class QueryResource(Resource):
         if not table:
             return api_response(False, '缺少table参数', status=400)
 
-        # 限制学生只可访问 Project 表
-        if role == 'Student' and table.lower() != 'project':
+        # 限制学生只可访问 project 表
+        if role == 'student' and table.lower() != 'project':
             return api_response(False, '学生无权限访问该表', status=403)
 
         view_table = f"view_{table.lower()}"
@@ -118,13 +118,13 @@ class QueryResource(Resource):
                     wheres.append(f"{field} LIKE %s")
                     sql_params.append(f"%{keyword}%")
 
-            # 前端传的是研究领域ID列表，必须关联 ProjectResearchField 表来筛选 project_id
+            # 前端传的是研究领域ID列表，必须关联 projectresearchfield 表来筛选 project_id
             if table.lower() == 'project' and research_field_ids:
                 # 查找同时包含所有 research_field_ids 的项目
                 cursor.execute(
                     f"""
                     SELECT project_id
-                    FROM ProjectResearchField
+                    FROM projectresearchfield
                     WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})
                     GROUP BY project_id
                     HAVING COUNT(DISTINCT research_field) = %s
@@ -140,7 +140,7 @@ class QueryResource(Resource):
                 cursor.execute(
                     f"""
                     SELECT student_id
-                    FROM StudentResearchField
+                    FROM studentresearchfield
                     WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})
                     GROUP BY student_id
                     HAVING COUNT(DISTINCT research_field) = %s
@@ -156,7 +156,7 @@ class QueryResource(Resource):
                 cursor.execute(
                     f"""
                     SELECT teacher_id
-                    FROM TeacherResearchField
+                    FROM teacherresearchfield
                     WHERE research_field IN ({','.join(['%s'] * len(research_field_ids))})
                     GROUP BY teacher_id
                     HAVING COUNT(DISTINCT research_field) = %s
@@ -169,11 +169,11 @@ class QueryResource(Resource):
                 wheres.append(f"teacher_id IN ({placeholders})")
                 sql_params += field_teacher_ids
 
-            # 权限控制逻辑（仅Project表启用）
+            # 权限控制逻辑（仅project表启用）
             if table.lower() == 'project':
-                if role == 'Student':
+                if role == 'student':
                     # 查找该学生参与的所有项目编号
-                    cursor.execute("SELECT project_id FROM StudentProject WHERE student_id = %s", (username, ))
+                    cursor.execute("SELECT project_id FROM studentproject WHERE student_id = %s", (username, ))
                     project_ids = [str(row['project_id']) for row in cursor.fetchall()]
                     if not project_ids:
                         return api_response(True, '暂无匹配数据', data={'results': [], 'related_data': {'相关学生': [], '相关教职工': [], '相关科研项目': []}, 'query_params': data})
@@ -182,9 +182,9 @@ class QueryResource(Resource):
                     wheres.append(f"project_id IN ({placeholders})")
                     sql_params += project_ids
 
-                elif role == 'Teacher':
+                elif role == 'teacher':
                     # 查找该教师参与的所有项目编号
-                    cursor.execute("SELECT project_id FROM TeacherProject WHERE teacher_id = %s", (username, ))
+                    cursor.execute("SELECT project_id FROM teacherproject WHERE teacher_id = %s", (username, ))
                     project_ids = [str(row['project_id']) for row in cursor.fetchall()]
                     if not project_ids:
                         return api_response(True, '暂无匹配数据', data={'results': [], 'related_data': {'相关学生': [], '相关教职工': [], '相关科研项目': []}, 'query_params': data})
@@ -232,7 +232,7 @@ class QueryResource(Resource):
 
 
 @query_ns.route('/statistics')
-class ProjectStatistics(Resource):
+class projectStatistics(Resource):
 
     @query_ns.response(200, '统计成功', success_model)
     @query_ns.response(500, '服务器错误', error_model)
@@ -257,7 +257,7 @@ class ProjectStatistics(Resource):
 
         try:
             # 执行 CALL
-            cursor.execute("CALL GetProjectStatisticsByMajor()")
+            cursor.execute("CALL GetprojectStatisticsByMajor()")
             data = cursor.fetchall()
 
             return api_response(True, '统计成功', {'results': convert_decimal_to_str(data)})

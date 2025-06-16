@@ -43,7 +43,7 @@ def api_response(success, message, data=None, status=200):
 # def get_field_id(research_field):
 #     connection = get_db_connection()
 #     cursor = connection.cursor()
-#     cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (research_field, ))
+#     cursor.execute("SELECT id FROM researchfields WHERE research_field = %s", (research_field, ))
 #     result = cursor.fetchone()
 #     cursor.close()
 #     connection.close()
@@ -56,7 +56,7 @@ def api_response(success, message, data=None, status=200):
 def get_fields():
     connection = get_db_connection()
     cursor = connection.cursor()
-    cursor.execute("SELECT id, research_field FROM ResearchFields")
+    cursor.execute("SELECT id, research_field FROM researchfields")
     fields = cursor.fetchall()
     cursor.close()
     connection.close()
@@ -71,9 +71,9 @@ def get_related_data_api(cursor, table, field_ids):
     related_data = {'相关学生': [], '相关教职工': [], '相关科研项目': []}
 
     relation_map = {
-        'Student': ('StudentResearchField', 'student_id', 'view_student', '相关学生'),
-        'Teacher': ('TeacherResearchField', 'teacher_id', 'view_teacher', '相关教职工'),
-        'Project': ('ProjectResearchField', 'project_id', 'view_project', '相关科研项目'),
+        'student': ('studentresearchfield', 'student_id', 'view_student', '相关学生'),
+        'teacher': ('teacherresearchfield', 'teacher_id', 'view_teacher', '相关教职工'),
+        'project': ('projectresearchfield', 'project_id', 'view_project', '相关科研项目'),
     }
 
     for related_table, (middle_table, id_field, view_name, target_key) in relation_map.items():

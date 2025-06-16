@@ -73,26 +73,26 @@ def import_student_data(file):
         cursor.execute("SET FOREIGN_KEY_CHECKS=0;")
 
         # 清空旧数据
-        cursor.execute("TRUNCATE TABLE StudentProject")
-        cursor.execute("TRUNCATE TABLE StudentResearchField")
-        cursor.execute("DELETE FROM Users WHERE role='Student'")
-        cursor.execute("TRUNCATE TABLE Student")
+        cursor.execute("TRUNCATE TABLE studentproject")
+        cursor.execute("TRUNCATE TABLE studentresearchfield")
+        cursor.execute("DELETE FROM users WHERE role='student'")
+        cursor.execute("TRUNCATE TABLE student")
 
         for _, row in df.iterrows():
             try:
                 student_id = row['student_id']
 
-                cursor.execute("SELECT * FROM Student WHERE student_id=%s", (student_id, ))
+                cursor.execute("SELECT * FROM student WHERE student_id=%s", (student_id, ))
                 if cursor.fetchone():
                     duplicates.add(f"重复学生学号: {student_id}")
                     continue
 
-                cursor.execute("INSERT INTO Student (student_id, name, gender, grade, major, class, phone, email) "
+                cursor.execute("INSERT INTO student (student_id, name, gender, grade, major, class, phone, email) "
                                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                                (student_id, row['name'], row['gender'], row['grade'], row['major'], row['class'], row['phone'], row['email']))
 
                 # 添加用户记录（默认密码为学号）
-                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Student')", (student_id, student_id))
+                cursor.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'student')", (student_id, student_id))
 
                 inserted_count += 1
 
@@ -103,14 +103,14 @@ def import_student_data(file):
                     if not fname:
                         continue
                     # 查询 ID
-                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                    cursor.execute("SELECT id FROM researchfields WHERE research_field = %s", (fname, ))
                     res = cursor.fetchone()
                     if not res:
                         duplicates.add(f"无效研究领域: {fname}（学生 {student_id}）")
                         continue
                     research_field = res['id']
                     # 插入中间表
-                    cursor.execute("INSERT IGNORE INTO StudentResearchField (student_id, research_field) VALUES (%s, %s)", (student_id, research_field))
+                    cursor.execute("INSERT IGNORE INTO studentresearchfield (student_id, research_field) VALUES (%s, %s)", (student_id, research_field))
 
             except Exception as e:
                 duplicates.add(f"插入失败: {student_id}，错误: {str(e)}")
@@ -157,27 +157,27 @@ def import_teacher_data(file):
     try:
         cursor.execute("SET FOREIGN_KEY_CHECKS=0;")
         # 清空旧数据
-        cursor.execute("TRUNCATE TABLE TeacherProject")
-        cursor.execute("TRUNCATE TABLE TeacherResearchField")
-        cursor.execute("DELETE FROM Users WHERE role='Teacher'")
-        cursor.execute("TRUNCATE TABLE Teacher")
+        cursor.execute("TRUNCATE TABLE teacherproject")
+        cursor.execute("TRUNCATE TABLE teacherresearchfield")
+        cursor.execute("DELETE FROM users WHERE role='teacher'")
+        cursor.execute("TRUNCATE TABLE teacher")
 
         for _, row in df.iterrows():
             try:
                 teacher_id = row['teacher_id']
 
-                cursor.execute("SELECT * FROM Teacher WHERE teacher_id=%s", (teacher_id, ))
+                cursor.execute("SELECT * FROM teacher WHERE teacher_id=%s", (teacher_id, ))
                 if cursor.fetchone():
                     duplicates.add(f"重复教职工号: {teacher_id}")
                     continue
 
                 cursor.execute(
-                    "INSERT INTO Teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
+                    "INSERT INTO teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (teacher_id, row['name'], row['gender'], row['title'], row['college'], row['department'],
                                                                         row['phone'], row['email'], row['office_location'], row['introduction']))
 
                 # 添加用户记录（默认密码为工号）
-                cursor.execute("INSERT INTO Users (username, password, role) VALUES (%s, %s, 'Teacher')", (teacher_id, teacher_id))
+                cursor.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'teacher')", (teacher_id, teacher_id))
 
                 inserted_count += 1
 
@@ -188,14 +188,14 @@ def import_teacher_data(file):
                     if not fname:
                         continue
                     # 查询 ID
-                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                    cursor.execute("SELECT id FROM researchfields WHERE research_field = %s", (fname, ))
                     res = cursor.fetchone()
                     if not res:
                         duplicates.add(f"无效研究领域: {fname}（教师 {teacher_id}）")
                         continue
                     research_field = res['id']
                     # 插入中间表
-                    cursor.execute("INSERT IGNORE INTO TeacherResearchField (teacher_id, research_field) VALUES (%s, %s)", (teacher_id, research_field))
+                    cursor.execute("INSERT IGNORE INTO teacherresearchfield (teacher_id, research_field) VALUES (%s, %s)", (teacher_id, research_field))
 
             except Exception as e:
                 duplicates.add(f"插入失败: {teacher_id}，错误: {str(e)}")
@@ -251,16 +251,16 @@ def import_project_data(file):
 
     try:
         cursor.execute("SET FOREIGN_KEY_CHECKS=0;")
-        cursor.execute("TRUNCATE TABLE StudentProject")
-        cursor.execute("TRUNCATE TABLE TeacherProject")
-        cursor.execute("TRUNCATE TABLE ProjectResearchField")
-        cursor.execute("TRUNCATE TABLE Project")
+        cursor.execute("TRUNCATE TABLE studentproject")
+        cursor.execute("TRUNCATE TABLE teacherproject")
+        cursor.execute("TRUNCATE TABLE projectresearchfield")
+        cursor.execute("TRUNCATE TABLE project")
 
         for _, row in df.iterrows():
             try:
                 project_id = row['project_id']
 
-                cursor.execute("SELECT * FROM Project WHERE project_id=%s", (project_id, ))
+                cursor.execute("SELECT * FROM project WHERE project_id=%s", (project_id, ))
                 if cursor.fetchone():
                     duplicates.add(f"重复项目编号: {project_id}")
                     continue
@@ -275,24 +275,24 @@ def import_project_data(file):
                     duplicates.add(f"学生 {leader_ids[0]} 在项目 {project_id} 中既是负责人又是成员，冲突")
                     continue
 
-                # 检查是否所有人存在于 Student/Teacher 表中
+                # 检查是否所有人存在于 student/teacher 表中
                 all_valid = True
 
                 if leader_ids:
-                    cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (leader_ids[0], ))
+                    cursor.execute("SELECT 1 FROM student WHERE student_id = %s", (leader_ids[0], ))
                     if not cursor.fetchone():
                         duplicates.add(f"负责人不存在: {leader_ids[0]}（项目 {project_id}）")
                         all_valid = False
 
                 for sid in member_ids:
-                    cursor.execute("SELECT 1 FROM Student WHERE student_id = %s", (sid, ))
+                    cursor.execute("SELECT 1 FROM student WHERE student_id = %s", (sid, ))
                     if not cursor.fetchone():
                         duplicates.add(f"成员不存在: {sid}（项目 {project_id}）")
                         all_valid = False
                         break
 
                 for tid in teacher_ids:
-                    cursor.execute("SELECT 1 FROM Teacher WHERE teacher_id = %s", (tid, ))
+                    cursor.execute("SELECT 1 FROM teacher WHERE teacher_id = %s", (tid, ))
                     if not cursor.fetchone():
                         duplicates.add(f"指导教师不存在: {tid}（项目 {project_id}）")
                         all_valid = False
@@ -316,7 +316,7 @@ def import_project_data(file):
 
                 # 插入主项目
                 cursor.execute(
-                    "INSERT INTO Project (project_id, project_name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
+                    "INSERT INTO project (project_id, project_name, project_content, project_application_status, project_approval_status, project_acceptance_status) "
                     "VALUES (%s, %s, %s, %s, %s, %s)", (project_id, row['project_name'], row['project_content'], row['project_application_status'],
                                                         row['project_approval_status'], row['project_acceptance_status']))
                 inserted_count += 1
@@ -327,28 +327,28 @@ def import_project_data(file):
                     fname = fname.strip()
                     if not fname:
                         continue
-                    cursor.execute("SELECT id FROM ResearchFields WHERE research_field = %s", (fname, ))
+                    cursor.execute("SELECT id FROM researchfields WHERE research_field = %s", (fname, ))
                     res = cursor.fetchone()
                     if not res:
                         duplicates.add(f"无效研究领域: {fname}（项目 {project_id}）")
                         continue
                     research_field = res['id']
-                    cursor.execute("INSERT IGNORE INTO ProjectResearchField (project_id, research_field) VALUES (%s, %s)", (project_id, research_field))
+                    cursor.execute("INSERT IGNORE INTO projectresearchfield (project_id, research_field) VALUES (%s, %s)", (project_id, research_field))
 
                 # 插入负责人
                 if leader_ids:
                     student_id = leader_ids[0]
-                    cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (student_id, project_id))
+                    cursor.execute("INSERT INTO studentproject (student_id, project_id, role) VALUES (%s, %s, '负责人')", (student_id, project_id))
                     student_leader_count[student_id] += 1
 
                 # 插入成员（最多4个）
                 for student_id in member_ids[:4]:
-                    cursor.execute("INSERT INTO StudentProject (student_id, project_id, role) VALUES (%s, %s, '成员')", (student_id, project_id))
+                    cursor.execute("INSERT INTO studentproject (student_id, project_id, role) VALUES (%s, %s, '成员')", (student_id, project_id))
                     student_member_count[student_id] += 1
 
                 # 插入指导教师（最多2个）
                 for teacher_id in teacher_ids[:2]:
-                    cursor.execute("INSERT INTO TeacherProject (teacher_id, project_id) VALUES (%s, %s)", (teacher_id, project_id))
+                    cursor.execute("INSERT INTO teacherproject (teacher_id, project_id) VALUES (%s, %s)", (teacher_id, project_id))
                     teacher_guide_count[teacher_id] += 1
 
             except Exception as e:

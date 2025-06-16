@@ -9,13 +9,13 @@ SET character_set_results = 'utf8mb4';
 
 
 -- 科研领域表
-CREATE TABLE IF NOT EXISTS ResearchFields (
+CREATE TABLE IF NOT EXISTS researchfields (
     id INT PRIMARY KEY,
     research_field VARCHAR(100) NOT NULL COMMENT '研究领域'
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- 插入科研领域表数据
-INSERT INTO ResearchFields (id, research_field) VALUES
+INSERT INTO researchfields (id, research_field) VALUES
 (1, '生物医药'), (2, '集成电路'), (3, '新能源汽车和智能网联汽车'), (4, '人工智能'),
 (5, '高端装备'), (6, '新材料'), (7, '光伏及新能源'), (8, '新型显示'),
 (9, '城市安全'), (10, '网络与信息安全'), (11, '节能环保'), (12, '智能家电'),
@@ -26,7 +26,7 @@ INSERT INTO ResearchFields (id, research_field) VALUES
 
 
 -- 教职工表
-CREATE TABLE IF NOT EXISTS Teacher (
+CREATE TABLE IF NOT EXISTS teacher (
     teacher_id VARCHAR(20) PRIMARY KEY COMMENT '教职工号',
     name VARCHAR(100) NOT NULL COMMENT '姓名',
     gender ENUM('男','女') COMMENT '性别',
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS Teacher (
 
 
 -- 学生表
-CREATE TABLE IF NOT EXISTS Student (
+CREATE TABLE IF NOT EXISTS student (
     student_id VARCHAR(20) PRIMARY KEY COMMENT '学生学号',
     name VARCHAR(100) NOT NULL COMMENT '姓名',
     gender ENUM('男','女') COMMENT '性别',
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS Student (
 
 
 -- 科研项目表
-CREATE TABLE IF NOT EXISTS Project (
+CREATE TABLE IF NOT EXISTS project (
     project_id VARCHAR(50) PRIMARY KEY COMMENT '项目编号',
     project_name VARCHAR(255) NOT NULL COMMENT '项目名称',
     project_content TEXT COMMENT '项目内容',
@@ -65,61 +65,61 @@ CREATE TABLE IF NOT EXISTS Project (
 
 
 -- 用户表
-CREATE TABLE IF NOT EXISTS Users (
+CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(50) PRIMARY KEY COMMENT '用户名',
     password VARCHAR(64) NOT NULL COMMENT '密码',
-    role ENUM('Admin', 'Teacher', 'Student') NOT NULL COMMENT '用户角色'
+    role ENUM('Admin', 'teacher', 'student') NOT NULL COMMENT '用户角色'
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
 -- 学生-科研项目关联表
-CREATE TABLE IF NOT EXISTS StudentProject (
+CREATE TABLE IF NOT EXISTS studentproject (
     student_id VARCHAR(20) NOT NULL COMMENT '学生学号',
     project_id VARCHAR(50) NOT NULL COMMENT '项目编号',
     role ENUM('负责人', '成员') NOT NULL COMMENT '在项目中的角色',
     PRIMARY KEY (student_id, project_id),
-    FOREIGN KEY (student_id) REFERENCES Student(student_id),
-    FOREIGN KEY (project_id) REFERENCES Project(project_id)
+    FOREIGN KEY (student_id) REFERENCES student(student_id),
+    FOREIGN KEY (project_id) REFERENCES project(project_id)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
 -- 教职工-科研项目关联表
-CREATE TABLE IF NOT EXISTS TeacherProject (
+CREATE TABLE IF NOT EXISTS teacherproject (
     teacher_id VARCHAR(20) NOT NULL COMMENT '教职工号',
     project_id VARCHAR(50) NOT NULL COMMENT '项目编号',
     PRIMARY KEY (teacher_id, project_id),
-    FOREIGN KEY (teacher_id) REFERENCES Teacher(teacher_id),
-    FOREIGN KEY (project_id) REFERENCES Project(project_id)
+    FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id),
+    FOREIGN KEY (project_id) REFERENCES project(project_id)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
 -- 学生–研究领域关联表
-CREATE TABLE IF NOT EXISTS StudentResearchField (
+CREATE TABLE IF NOT EXISTS studentresearchfield (
     student_id VARCHAR(20) NOT NULL COMMENT '学生学号',
     research_field INT NOT NULL COMMENT '研究领域',
     PRIMARY KEY (student_id, research_field),
-    FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (research_field) REFERENCES ResearchFields(id) ON DELETE CASCADE ON UPDATE CASCADE
+    FOREIGN KEY (student_id) REFERENCES student(student_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (research_field) REFERENCES researchfields(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
 -- 教职工–研究领域关联表
-CREATE TABLE IF NOT EXISTS TeacherResearchField (
+CREATE TABLE IF NOT EXISTS teacherresearchfield (
     teacher_id VARCHAR(20) NOT NULL COMMENT '教师工号',
     research_field INT NOT NULL COMMENT '研究领域',
     PRIMARY KEY (teacher_id, research_field),
-    FOREIGN KEY (teacher_id) REFERENCES Teacher(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (research_field) REFERENCES ResearchFields(id) ON DELETE CASCADE ON UPDATE CASCADE
+    FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (research_field) REFERENCES researchfields(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
 -- 科研项目–研究领域关联表
-CREATE TABLE IF NOT EXISTS ProjectResearchField (
+CREATE TABLE IF NOT EXISTS projectresearchfield (
     project_id VARCHAR(50) NOT NULL COMMENT '项目编号',
     research_field INT NOT NULL COMMENT '研究领域',
     PRIMARY KEY (project_id, research_field),
-    FOREIGN KEY (project_id) REFERENCES Project(project_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (research_field) REFERENCES ResearchFields(id) ON DELETE CASCADE ON UPDATE CASCADE
+    FOREIGN KEY (project_id) REFERENCES project(project_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (research_field) REFERENCES researchfields(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
@@ -133,31 +133,31 @@ SELECT
     -- 负责人显示为 姓名(学号)
     (
         SELECT GROUP_CONCAT(CONCAT(s.name, '(', s.student_id, ')') SEPARATOR '、')
-        FROM StudentProject sp
-        JOIN Student s ON sp.student_id = s.student_id
+        FROM studentproject sp
+        JOIN student s ON sp.student_id = s.student_id
         WHERE sp.project_id = p.project_id AND sp.role = '负责人'
     ) AS leader,
     -- 成员显示为 姓名(学号)
     (
         SELECT GROUP_CONCAT(CONCAT(s.name, '(', s.student_id, ')') SEPARATOR '、')
-        FROM StudentProject sp
-        JOIN Student s ON sp.student_id = s.student_id
+        FROM studentproject sp
+        JOIN student s ON sp.student_id = s.student_id
         WHERE sp.project_id = p.project_id AND sp.role = '成员'
     ) AS member,
     -- 指导教师显示为 姓名(教职工号)
     (
         SELECT GROUP_CONCAT(CONCAT(t.name, '(', t.teacher_id, ')') SEPARATOR '、')
-        FROM TeacherProject tp
-        JOIN Teacher t ON tp.teacher_id = t.teacher_id
+        FROM teacherproject tp
+        JOIN teacher t ON tp.teacher_id = t.teacher_id
         WHERE tp.project_id = p.project_id
     ) AS teacher,
     -- 状态字段
     p.project_application_status,
     p.project_approval_status,
     p.project_acceptance_status
-FROM Project p
-LEFT JOIN ProjectResearchField prf ON p.project_id = prf.project_id
-LEFT JOIN ResearchFields rf ON prf.research_field = rf.id
+FROM project p
+LEFT JOIN projectresearchfield prf ON p.project_id = prf.project_id
+LEFT JOIN researchfields rf ON prf.research_field = rf.id
 GROUP BY p.project_id;
 
 
@@ -173,9 +173,9 @@ SELECT
     s.phone,
     s.email,
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field
-FROM Student s
-LEFT JOIN StudentResearchField srf ON s.student_id = srf.student_id
-LEFT JOIN ResearchFields rf ON srf.research_field = rf.id
+FROM student s
+LEFT JOIN studentresearchfield srf ON s.student_id = srf.student_id
+LEFT JOIN researchfields rf ON srf.research_field = rf.id
 GROUP BY s.student_id;
 
 
@@ -193,16 +193,16 @@ SELECT
     t.office_location,
     t.introduction,
     GROUP_CONCAT(DISTINCT rf.research_field SEPARATOR '、') AS research_field
-FROM Teacher t
-LEFT JOIN TeacherResearchField trf ON t.teacher_id = trf.teacher_id
-LEFT JOIN ResearchFields rf ON trf.research_field = rf.id
+FROM teacher t
+LEFT JOIN teacherresearchfield trf ON t.teacher_id = trf.teacher_id
+LEFT JOIN researchfields rf ON trf.research_field = rf.id
 GROUP BY t.teacher_id;
 
 
 -- 申报触发器
 DELIMITER $$
 CREATE TRIGGER trg_project_application
-BEFORE UPDATE ON Project
+BEFORE UPDATE ON project
 FOR EACH ROW
 BEGIN
     IF NEW.project_application_status = 'TRIGGER_PENDING' THEN
@@ -214,7 +214,7 @@ DELIMITER ;
 -- 审批触发器
 DELIMITER $$
 CREATE TRIGGER trg_project_approval
-BEFORE UPDATE ON Project
+BEFORE UPDATE ON project
 FOR EACH ROW
 BEGIN
     IF NEW.project_approval_status = 'TRIGGER_PENDING' THEN
@@ -226,7 +226,7 @@ DELIMITER ;
 -- 验收触发器
 DELIMITER $$
 CREATE TRIGGER trg_project_acceptance
-BEFORE UPDATE ON Project
+BEFORE UPDATE ON project
 FOR EACH ROW
 BEGIN
     IF NEW.project_acceptance_status = 'TRIGGER_PENDING' THEN
@@ -238,41 +238,41 @@ DELIMITER ;
 -- 统计的存储过程
 DELIMITER //
 
-CREATE PROCEDURE GetProjectStatisticsByMajor()
+CREATE PROCEDURE GetprojectStatisticsByMajor()
 BEGIN
     SELECT 
         s.major AS 专业,
         SUM(CASE WHEN p.project_application_status LIKE '%申报通过' THEN 1 ELSE 0 END) AS 申报通过数,
         SUM(CASE WHEN p.project_approval_status LIKE '%审批通过' THEN 1 ELSE 0 END) AS 审批通过数,
         SUM(CASE WHEN p.project_acceptance_status LIKE '%验收通过' THEN 1 ELSE 0 END) AS 验收通过数
-    FROM Project p
-    JOIN StudentProject sp ON p.project_id = sp.project_id AND sp.role = '负责人'
-    JOIN Student s ON sp.student_id = s.student_id
+    FROM project p
+    JOIN studentproject sp ON p.project_id = sp.project_id AND sp.role = '负责人'
+    JOIN student s ON sp.student_id = s.student_id
     GROUP BY s.major
     ORDER BY s.major;
 END //
 
 DELIMITER ;
 
--- Student 表索引
-CREATE INDEX idx_student_name ON Student(name);
-CREATE INDEX idx_student_grade ON Student(grade);
-CREATE INDEX idx_student_major ON Student(major);
-CREATE INDEX idx_student_class ON Student(class);
-CREATE INDEX idx_student_email ON Student(email);
-CREATE INDEX idx_student_phone ON Student(phone);
+-- student 表索引
+CREATE INDEX idx_student_name ON student(name);
+CREATE INDEX idx_student_grade ON student(grade);
+CREATE INDEX idx_student_major ON student(major);
+CREATE INDEX idx_student_class ON student(class);
+CREATE INDEX idx_student_email ON student(email);
+CREATE INDEX idx_student_phone ON student(phone);
 
--- Teacher 表索引
-CREATE INDEX idx_teacher_name ON Teacher(name);
-CREATE INDEX idx_teacher_title ON Teacher(title);
-CREATE INDEX idx_teacher_college ON Teacher(college);
-CREATE INDEX idx_teacher_department ON Teacher(department);
-CREATE INDEX idx_teacher_email ON Teacher(email);
-CREATE INDEX idx_teacher_phone ON Teacher(phone);
-CREATE INDEX idx_teacher_office_location ON Teacher(office_location);
+-- teacher 表索引
+CREATE INDEX idx_teacher_name ON teacher(name);
+CREATE INDEX idx_teacher_title ON teacher(title);
+CREATE INDEX idx_teacher_college ON teacher(college);
+CREATE INDEX idx_teacher_department ON teacher(department);
+CREATE INDEX idx_teacher_email ON teacher(email);
+CREATE INDEX idx_teacher_phone ON teacher(phone);
+CREATE INDEX idx_teacher_office_location ON teacher(office_location);
 
--- Project 表索引
-CREATE INDEX idx_project_name ON Project(project_name);
-CREATE INDEX idx_project_application_status ON Project(project_application_status);
-CREATE INDEX idx_project_approval_status ON Project(project_approval_status);
-CREATE INDEX idx_project_acceptance_status ON Project(project_acceptance_status);
+-- project 表索引
+CREATE INDEX idx_project_name ON project(project_name);
+CREATE INDEX idx_project_application_status ON project(project_application_status);
+CREATE INDEX idx_project_approval_status ON project(project_approval_status);
+CREATE INDEX idx_project_acceptance_status ON project(project_acceptance_status);

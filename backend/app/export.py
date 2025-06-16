@@ -25,7 +25,7 @@ class ExportExcel(Resource):
     @ns.response(400, '无效请求')
     @ns.response(500, '导出失败')
     @ns.doc(description='将前端查询结果导出为 Excel 文件（自动命名）')
-    @auth_required(roles=['Admin', 'Teacher', 'Student'])
+    @auth_required(roles=['Admin', 'teacher', 'student'])
     def post(self):
         try:
             payload = request.get_json()
