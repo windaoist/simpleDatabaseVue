@@ -469,24 +469,24 @@ class EditData(Resource):
                 accp_status = row['project_acceptance_status']
 
                 # 状态约束判断
-                if accp_status == '验收通过':
+                if '验收通过' in accp_status:
                     return api_response(False, '项目已验收通过，禁止编辑', status=403)
 
-                if app_status == '未申报':
+                if '未申报' in app_status:
                     if role != 'student':
                         return api_response(False, '仅负责人可编辑未申报项目', status=403)
                     cursor.execute("SELECT 1 FROM studentproject WHERE project_id=%s AND student_id=%s AND role='负责人'", (project_id, user_id))
                     if not cursor.fetchone():
                         return api_response(False, '您无权编辑该项目（不是负责人）', status=403)
 
-                elif app_status == '申报通过' and aprv_status == '未审批':
+                elif '申报通过' in app_status and '未审批' in aprv_status:
                     if role != 'teacher':
                         return api_response(False, '仅指导教师可编辑该项目', status=403)
                     cursor.execute("SELECT 1 FROM teacherproject WHERE project_id=%s AND teacher_id=%s", (project_id, user_id))
                     if not cursor.fetchone():
                         return api_response(False, '您无权编辑该项目（不是指导教师）', status=403)
 
-                elif aprv_status == '审批通过' and accp_status == '未验收':
+                elif '审批通过' in aprv_status and '未验收' in accp_status:
                     if role != 'Admin':
                         return api_response(False, '仅管理员可编辑该项目', status=403)
 
@@ -575,7 +575,7 @@ class DeleteData(Resource):
                 acceptance_status = row['project_acceptance_status']
 
                 # 已审批/验收项目仅 Admin 可删
-                if (approval_status == '审批通过' or acceptance_status == '验收通过') and role != 'Admin':
+                if ('审批通过' in approval_status or '验收通过' in acceptance_status) and role != 'Admin':
                     return api_response(False, '项目已审批或验收，仅管理员可删除', status=403)
 
                 # 权限校验
