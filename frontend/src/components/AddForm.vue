@@ -3,7 +3,7 @@
 import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
-import { getPrimaryLabel, getTableSchema } from '@/utils/TableStructure'
+import { getNecessity, getPrimaryLabel, getTableSchema } from '@/utils/TableStructure'
 
 const props = defineProps({
   currentTable: {
@@ -42,7 +42,7 @@ const loading = ref({
 const formData = ref({
   filters: {} as Record<string, any>,
 })
-
+const rawFields = ref()
 // 计算属性判断是否为编辑模式
 const isEditMode = computed(() => props.initialData !== null)
 
@@ -101,8 +101,8 @@ function initialize(tableName) {
 }
 function onQuery(tableName: 'student' | 'teacher' | 'project_submit' | 'project') {
   try {
-    const rawFields = getTableSchema(tableName)
-    fields.value = rawFields.map((field) => {
+    rawFields.value = getTableSchema(tableName)
+    fields.value = rawFields.value.map((field) => {
       if (field.options && typeof field.options === 'object' && 'value' in field.options) {
         return { ...field, options: field.options.value }
       }
@@ -170,12 +170,13 @@ function handleSubmit() {
 
 <template>
   <div class="add-form" v-if="fields.length > 0">
-    <el-form :model="formData" label-width="120px" ref="formRef">
+    <el-form :model="formData" :rules="rawFields.rules" label-width="120px" ref="formRef">
       <div class="form-area">
         <el-form-item
           v-for="field in fields"
           :key="field.name"
           :label="field.label"
+          :required="getNecessity(currentTable, field.name)"
           style="flex: 1; min-width: 250px; margin-bottom: 20px"
         >
           <template v-if="field.name === 'leader'">
@@ -317,7 +318,7 @@ function handleSubmit() {
   grid-template-columns: repeat(2, 1fr);
   gap: 20px 30px;
   max-width: 1200px;
-  margin: 20px 0px 0px 60px;
+  margin: 20px auto;
   padding: 0 15px;
   align-items: start;
 }

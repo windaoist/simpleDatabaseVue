@@ -30,7 +30,7 @@ export const tableSchemas = {
         { value: '男', label: '男' },
         { value: '女', label: '女' },
       ],
-      rules: [{ required: false, message: '请选择性别' }],
+      rules: [{ required: true, message: '请选择性别' }],
     },
     {
       name: 'grade',
@@ -103,7 +103,7 @@ export const tableSchemas = {
         { value: '男', label: '男' },
         { value: '女', label: '女' },
       ],
-      rules: [{ required: false, message: '请选择性别' }],
+      rules: [{ required: true, message: '请选择性别' }],
     },
     {
       name: 'title',
@@ -312,4 +312,12 @@ export function getPrimaryLabel(tableName: 'student' | 'teacher' | 'project' | '
   const schema = tableSchemas[tableName]
   const primaryKeyField = schema.find((field) => field.primaryKey)
   return primaryKeyField ? primaryKeyField.label : null
+}
+export function getNecessity(
+  tableName: 'student' | 'teacher' | 'project' | 'project_submit' | '',
+  id,
+) {
+  const schema = tableSchemas[tableName]
+  const necessity = schema.find((field) => field.name === id).rules[0].required
+  return necessity
 }
