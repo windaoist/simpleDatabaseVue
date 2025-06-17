@@ -68,7 +68,7 @@ class RestoreFromFile(Resource):
     @backup_ns.response(404, '文件不存在', error_model)
     @backup_ns.response(500, '恢复失败', error_model)
     @auth_required(roles=['Admin'])
-    def post(self):
+    def get(self):
         source = request.args.get('source')
         filename = request.args.get('filename')
 
