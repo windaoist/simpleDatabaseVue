@@ -108,9 +108,8 @@ function onQuery(tableName: 'student' | 'teacher' | 'project_submit' | 'project'
       }
       return field
     })
-    if (isEditMode.value) {
-      initialize(tableName)
-    }
+
+    initialize(tableName)
   } catch (error) {
     ElMessage.error('获取表格式失败: ' + (error as Error).message)
   }
@@ -265,7 +264,8 @@ function handleSubmit() {
             <el-input
               v-else-if="field.label === primaryLabel"
               v-model="formData.filters[field.name]"
-              disabled
+              :disabled="isEditMode"
+              :placeholder="`请输入${field.label}`"
               type="textarea"
               :autosize="{ minRows: 1, maxRows: 4 }"
               style="width: 100%"
