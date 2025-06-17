@@ -189,7 +189,7 @@ class ManualBackup(Resource):
             file_path = os.path.join(backup_dir, filename)
 
             cmd = [
-                r"C:\Program Files\MySQL\MySQL Server 9.2\bin\mysqldump.exe",
+                "mysqldump",
                 f"-h{db_host}",
                 f"-u{db_user}",
                 f"-p{db_password}",
@@ -286,7 +286,7 @@ def auto_backup_database(root_path=None):
             os.remove(os.path.join(backup_dir, oldest))
 
         cmd = [
-            r"C:\Program Files\MySQL\MySQL Server 9.2\bin\mysqldump.exe",
+            "mysqldump",
             f"-h{db_host}",
             f"-u{db_user}",
             f"-p{db_password}",
