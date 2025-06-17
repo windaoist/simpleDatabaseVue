@@ -148,7 +148,7 @@ class AddData(Resource):
 
                 # 插入学生表
                 cursor.execute("INSERT INTO student (student_id, name, gender, grade, major, class, phone, email) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                               (record_data['student_id'], record_data['name'], record_data('gender', ''), record_data.get('grade', ''),
+                               (record_data['student_id'], record_data['name'], record_data['gender'], record_data.get('grade', ''),
                                 record_data.get('major', ''), record_data.get('class', ''), record_data.get('phone', ''), record_data.get('email', '')))
 
                 # 插入研究领域关联表
@@ -185,7 +185,7 @@ class AddData(Resource):
                 cursor.execute(
                     "INSERT INTO teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (record_data['teacher_id'], record_data['name'], record_data('gender', ''), record_data.get('title', ''), record_data.get(
+                    (record_data['teacher_id'], record_data['name'], record_data['gender'], record_data.get('title', ''), record_data.get(
                         'college', ''), record_data.get('department', ''), record_data.get('phone', ''), record_data.get(
                             'email', ''), record_data.get('office_location', ''), record_data.get('introduction', '')))
 
