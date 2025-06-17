@@ -137,7 +137,7 @@ class AddData(Resource):
                 if role != 'Admin':
                     return api_response(False, '仅管理员可添加学生信息', status=403)
 
-                required_fields = ['student_id', 'name']
+                required_fields = ['student_id', 'name', 'gender']
                 if not all(record_data.get(field) and str(record_data.get(field)).strip() for field in required_fields):
                     return api_response(False, '存在必要字段为空', status=400)
 
@@ -148,7 +148,7 @@ class AddData(Resource):
 
                 # 插入学生表
                 cursor.execute("INSERT INTO student (student_id, name, gender, grade, major, class, phone, email) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                               (record_data['student_id'], record_data['name'], record_data.get('gender', ''), record_data.get('grade', ''),
+                               (record_data['student_id'], record_data['name'], record_data('gender', ''), record_data.get('grade', ''),
                                 record_data.get('major', ''), record_data.get('class', ''), record_data.get('phone', ''), record_data.get('email', '')))
 
                 # 插入研究领域关联表
@@ -172,7 +172,7 @@ class AddData(Resource):
                 if role != 'Admin':
                     return api_response(False, '仅管理员可添加教师信息', status=403)
 
-                required_fields = ['teacher_id', 'name']
+                required_fields = ['teacher_id', 'name', 'gender']
                 if not all(record_data.get(field) and str(record_data.get(field)).strip() for field in required_fields):
                     return api_response(False, '存在必要字段为空', status=400)
 
@@ -185,7 +185,7 @@ class AddData(Resource):
                 cursor.execute(
                     "INSERT INTO teacher (teacher_id, name, gender, title, college, department, phone, email, office_location, introduction) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (record_data['teacher_id'], record_data['name'], record_data.get('gender', ''), record_data.get('title', ''), record_data.get(
+                    (record_data['teacher_id'], record_data['name'], record_data('gender', ''), record_data.get('title', ''), record_data.get(
                         'college', ''), record_data.get('department', ''), record_data.get('phone', ''), record_data.get(
                             'email', ''), record_data.get('office_location', ''), record_data.get('introduction', '')))
 
@@ -260,13 +260,14 @@ class AddData(Resource):
 
                 # 插入主表
                 cursor.execute("INSERT INTO project (project_id, project_name, project_content) "
-                               "VALUES (%s, %s, %s)", (project_id, record_data['project_name'], record_data['project_content']))
+                               "VALUES (%s, %s, %s)", (project_id, record_data['project_name'], record_data.get('project_content', '')))
 
                 # 插入研究领域
                 field_str = record_data.get('research_field', '')
-                research_fields = [int(fid) for fid in field_str.split('、') if fid.isdigit()]
-                for fid in research_fields:
-                    cursor.execute("INSERT IGNORE INTO projectresearchfield (project_id, research_field) VALUES (%s, %s)", (project_id, fid))
+                if field_str:
+                    research_fields = [int(fid) for fid in field_str.split('、') if fid.isdigit()]
+                    for fid in research_fields:
+                        cursor.execute("INSERT IGNORE INTO projectresearchfield (project_id, research_field) VALUES (%s, %s)", (project_id, fid))
 
                 # 插入负责人（当前用户）
                 cursor.execute("SELECT name FROM student WHERE student_id=%s", (student_leader_id, ))
