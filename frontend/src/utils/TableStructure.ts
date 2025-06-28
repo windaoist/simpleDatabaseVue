@@ -12,7 +12,7 @@ export const tableSchemas = {
       type: 'text',
       rules: [
         { required: true, message: '学号不能为空' },
-        { pattern: /^\d{10}$/, message: '学号必须为10位数字' },
+        { pattern: /^\d{9}$/, message: '学号必须为9位数字' },
       ],
       primaryKey: true,
     },
@@ -36,19 +36,28 @@ export const tableSchemas = {
       name: 'grade',
       label: '年级',
       type: 'text',
-      rules: [{ required: false, message: '年级不能为空' }],
+      rules: [
+        { required: false, message: '年级不能为空' },
+        { pattern: /^202\d$/, message: '年级格式应为202X (如2023)' },
+      ],
     },
     {
       name: 'major',
       label: '专业',
       type: 'text',
-      rules: [{ required: false, message: '专业不能为空' }],
+      rules: [
+        { required: false, message: '专业不能为空' },
+        { pattern: /^[\u4e00-\u9fa5]+$/, message: '专业只能是汉字' },
+      ],
     },
     {
       name: 'class',
       label: '班级',
       type: 'text',
-      rules: [{ required: false, message: '班级不能为空' }],
+      rules: [
+        { required: false, message: '班级不能为空' },
+        { pattern: /^202\d级[\u4e00-\u9fa5]+[1-9]\d*班$/, message: '班级格式错误' },
+      ],
     },
     {
       name: 'research_field',
@@ -74,7 +83,11 @@ export const tableSchemas = {
       type: 'text',
       rules: [
         { required: false, message: '邮箱不能为空' },
-        { pattern: /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, message: '邮箱格式不正确' },
+        {
+          pattern:
+            /^[\w\u4e00-\u9fa5]+([.-]?[\w\u4e00-\u9fa5]+)*@[\w\u4e00-\u9fa5]+([.-]?[\w\u4e00-\u9fa5]+)*(\.\w{2,})+$/,
+          message: '邮箱格式不正确',
+        },
       ],
     },
   ],
@@ -85,7 +98,7 @@ export const tableSchemas = {
       type: 'text',
       rules: [
         { required: true, message: '教师ID不能为空' },
-        { pattern: /^T\d{6}$/, message: '格式应为T+6位数字' },
+        { pattern: /^\d{8}$/, message: '格式应为8位数字' },
       ],
       primaryKey: true,
     },
@@ -109,19 +122,28 @@ export const tableSchemas = {
       name: 'title',
       label: '职称',
       type: 'text',
-      rules: [{ required: false, message: '职称不能为空' }],
+      rules: [
+        { required: false, message: '职称不能为空' },
+        { pattern: /^[\u4e00-\u9fa5]{2,6}$/, message: '职称应为2-6个中文字符' },
+      ],
     },
     {
       name: 'college',
       label: '所属学院',
       type: 'text',
-      rules: [{ required: false, message: '学院不能为空' }],
+      rules: [
+        { required: false, message: '学院不能为空' },
+        { pattern: /^[\u4e00-\u9fa5]{2,10}学院$/, message: '学院名称格式应为XX学院' },
+      ],
     },
     {
       name: 'department',
       label: '所属专业',
       type: 'text',
-      rules: [{ required: false, message: '系别不能为空' }],
+      rules: [
+        { required: false, message: '系别不能为空' },
+        { pattern: /^[\u4e00-\u9fa5]{2,10}系$/, message: '系别名称格式应为XX系' },
+      ],
     },
     {
       name: 'research_field',
@@ -147,14 +169,24 @@ export const tableSchemas = {
       type: 'text',
       rules: [
         { required: false, message: '邮箱不能为空' },
-        { pattern: /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, message: '邮箱格式不正确' },
+        {
+          pattern:
+            /^[\w\u4e00-\u9fa5]+([.-]?[\w\u4e00-\u9fa5]+)*@[\w\u4e00-\u9fa5]+([.-]?[\w\u4e00-\u9fa5]+)*(\.\w{2,})+$/,
+          message: '邮箱格式不正确',
+        },
       ],
     },
     {
       name: 'office_location',
       label: '办公地点',
       type: 'text',
-      rules: [{ required: false, message: '办公室位置不能为空' }],
+      rules: [
+        { required: false, message: '办公室位置不能为空' },
+        {
+          pattern: /^[\u4e00-\u9fa5]{2,6}[A-Za-z]?\d{3}$/,
+          message: '格式应为楼宇名+房间号 (如逸夫楼A301)',
+        },
+      ],
     },
     {
       name: 'introduction',

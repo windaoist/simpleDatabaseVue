@@ -150,8 +150,62 @@ async function validateAndAdd(fieldName: string) {
 function removeMember(fieldName: string, index: number) {
   memberList.value[fieldName].splice(index, 1)
 }
-
+const validatePattern = (value: string, pattern: RegExp): boolean => {
+  return pattern.test(value)
+}
 function handleSubmit() {
+  // 新增：表单字段校验
+  let isValid = true
+  let errorMessage = ''
+
+  // 遍历所有字段进行校验
+  for (const field of fields.value) {
+    const fieldValue = formData.value.filters[field.name]
+
+    // 跳过值为空的非必填字段
+    if (!fieldValue && !getNecessity(props.currentTable, field.name)) continue
+
+    // 检查字段规则
+    if (field.rules && field.rules.length > 0) {
+      for (const rule of field.rules) {
+        // 必填校验
+        if (rule.required && !fieldValue) {
+          isValid = false
+          errorMessage = rule.message
+          break
+        }
+
+        // 正则表达式校验
+        if (rule.pattern && fieldValue) {
+          if (!validatePattern(fieldValue, rule.pattern)) {
+            isValid = false
+            errorMessage = rule.message
+            break
+          }
+        }
+      }
+    }
+
+    if (!isValid) break
+  }
+
+  // 新增：成员字段校验
+  if (isValid && (props.currentTable === 'project' || props.currentTable === 'project_submit')) {
+    if (memberList.value.member.length === 0) {
+      isValid = false
+      errorMessage = '请至少添加一个成员'
+    }
+    if (memberList.value.teacher.length === 0) {
+      isValid = false
+      errorMessage = '请至少添加一位指导教师'
+    }
+  }
+
+  // 如果校验失败，显示错误信息
+  if (!isValid) {
+    ElMessage.error(errorMessage)
+    return
+  }
   if (isEditMode.value) {
     // 编辑模式时触发 update 事件
     emit('update', {
