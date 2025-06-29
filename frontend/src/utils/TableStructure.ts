@@ -142,7 +142,7 @@ export const tableSchemas = {
       type: 'text',
       rules: [
         { required: false, message: '系别不能为空' },
-        { pattern: /^[\u4e00-\u9fa5]{2,10}系$/, message: '系别名称格式应为XX系' },
+        { pattern: /^[\u4e00-\u9fa5]+$/, message: '系别只能是汉字' },
       ],
     },
     {
@@ -202,7 +202,7 @@ export const tableSchemas = {
       type: 'text',
       rules: [
         { required: true, message: '项目ID不能为空' },
-        { pattern: /^P\d{8}$/, message: '格式应为P+8位数字' },
+        { pattern: /^PJT\d{8}$/, message: '格式应为PJT+8位数字' },
       ],
       primaryKey: true,
     },
