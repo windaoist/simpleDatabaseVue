@@ -202,7 +202,7 @@ export const tableSchemas = {
       type: 'text',
       rules: [
         { required: true, message: '项目ID不能为空' },
-        { pattern: /^PJT\d{8}$/, message: '格式应为PJT+8位数字' },
+        { pattern: /^PJT\d{8}$/, message: '项目ID格式应为PJT+8位数字' },
       ],
       primaryKey: true,
     },
@@ -283,7 +283,7 @@ export const tableSchemas = {
       type: 'text',
       rules: [
         { required: true, message: '项目ID不能为空' },
-        { pattern: /^P\d{8}$/, message: '格式应为P+8位数字' },
+        { pattern: /^PJT\d{8}$/, message: '项目ID格式应为PJT+8位数字' },
       ],
       primaryKey: true,
     },
